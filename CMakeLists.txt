@@ -128,8 +128,7 @@ add_library(ExamplePlugin SHARED
     example_plugin.hpp
 )
 add_dependencies(ExamplePlugin hyriseConsole)
-target_link_libraries(ExamplePlugin hyrise)
-
+target_link_libraries(ExamplePlugin PRIVATE "-undefined dynamic_lookup")
 
 ### Modify this part to add your own plugin
 
@@ -143,5 +142,5 @@ target_link_libraries(ExamplePlugin hyrise)
 # 2. Insert name and add dependencies (usually hyriseConsole and/or hyriseServer)
 # add_dependencies(PluginName hyriseConsole)
 
-# 3. Insert name and add libraries to link with (usually hyrise)
-# target_link_libraries(PluginName hyrise)
+# 3. Insert name and add libraries to link with
+#target_link_libraries(PluginName PRIVATE "-undefined dynamic_lookup")
