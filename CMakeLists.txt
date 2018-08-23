@@ -123,15 +123,25 @@ add_definitions("-DSOURCE_PATH_SIZE=${SOURCE_PATH_SIZE}")
 # Global flags and include directories
 add_compile_options(-std=c++17 -pthread -Wall -Wextra -pedantic -Werror -Wno-unused-parameter)
 
-# set(
-#     SOURCES
-#     example_plugin.cpp
-#     example_plugin.hpp
-# )
-
 add_library(ExamplePlugin SHARED
     example_plugin.cpp
     example_plugin.hpp
 )
 add_dependencies(ExamplePlugin hyriseConsole)
 target_link_libraries(ExamplePlugin hyrise)
+
+
+### Modify this part to add your own plugin
+
+# 1. Insert name and add source files necessary to build the library
+# add_library(PluginName SHARED
+    # Add source files needed for your plugin here
+    # plugin_name.cpp
+    # plugin_name.hpp
+# )
+
+# 2. Insert name and add dependencies (usually hyriseConsole and/or hyriseServer)
+# add_dependencies(PluginName hyriseConsole)
+
+# 3. Insert name and add libraries to link with (usually hyrise)
+# target_link_libraries(PluginName hyrise)
