@@ -4,6 +4,7 @@ This repository contains an example plugin for Hyrise. It can be used as a basis
 
 ## Development
 
+1. Check out the submodules and their dependencies: `git submodule update --init --recursive`
 1. Take a look at the example_plugin files. These can be used as a blueprint for other plugins.
 1. Implement your plugin according to the example plugin. Make sure it inherits from `AbstractPlugin` and `Singleton` (hyrise/src/lib/utils/(abstract_plugin || singleton).hpp).
 1. Add the necessary information to build your plugin to CMakeLists.txt. A self-explanatory skeleton is provided in the file itself.
