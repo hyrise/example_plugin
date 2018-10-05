@@ -2,11 +2,13 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)                                                     #
                                                                                                     #
 # Include CMakeLists.txt of Hyrise (all the build magic is contained there)                         #
-add_subdirectory(hyrise/ EXCLUDE_FROM_ALL)                                                          #
+add_subdirectory(hyrise/)                                                                           #
                                                                                                     #
 # Add hyrise sources to be able to include headers                                                  #
 include_directories(                                                                                #
     ${PROJECT_SOURCE_DIR}/hyrise/src/lib/                                                           #
+    ${TBB_INCLUDE_DIR}                                                                              #
+    ${Boost_INCLUDE_DIRS}                                                                           #
 )                                                                                                   #
                                                                                                     #
 # This will be used by the DebugAssert macro to output                                              #
