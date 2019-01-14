@@ -7,22 +7,14 @@ add_subdirectory(hyrise/)                                                       
 # Add hyrise sources to be able to include headers                                                  #
 include_directories(                                                                                #
     ${PROJECT_SOURCE_DIR}/hyrise/src/lib/                                                           #
+    ${PROJECT_SOURCE_DIR}/hyrise/third_party/sql-parser/src                                         #
     ${TBB_INCLUDE_DIR}                                                                              #
     ${Boost_INCLUDE_DIRS}                                                                           #
 )                                                                                                   #
                                                                                                     #
-# This will be used by the DebugAssert macro to output                                              #
-# a file path relative to CMAKE_SOURCE_DIR                                                          #
-string(LENGTH "${CMAKE_SOURCE_DIR}/" SOURCE_PATH_SIZE)                                              #
-if (CMAKE_CXX_COMPILER_LAUNCHER)                                                                    #
-    if (${CMAKE_CXX_COMPILER_LAUNCHER} STREQUAL "ccache")                                           #
-        string(LENGTH "" SOURCE_PATH_SIZE)                                                          #
-    endif()                                                                                         #
-endif()                                                                                             #
-add_definitions("-DSOURCE_PATH_SIZE=${SOURCE_PATH_SIZE}")                                           #
-                                                                                                    #
 # Global flags and include directories                                                              #
-add_compile_options(-std=c++17 -pthread -Wall -Wextra -pedantic -Werror -Wno-unused-parameter)      #
+add_compile_options(-std=c++17 -pthread -Wall -Wextra -pedantic -Werror -Wno-unused-parameter       #
+-Wno-dollar-in-identifier-extension -Wno-unknown-pragmas)                                           #
                                                                                                     #
 #####################################################################################################
 
