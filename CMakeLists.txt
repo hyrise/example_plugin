@@ -21,3 +21,4 @@ add_compile_options(-std=c++17 -pthread -Wall -Wextra -pedantic -Werror -Wno-unu
 
 ### Modify this line to add your own plugin
 add_plugin(NAME ExamplePlugin SRCS example_plugin.cpp example_plugin.hpp DEPS hyriseConsole)
+add_plugin(NAME Driver SRCS driver.cpp driver.hpp DEPS hyriseConsole)
