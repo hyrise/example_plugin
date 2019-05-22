@@ -1,6 +1,6 @@
 # Hyrise Example Plugin
 
-This repository contains an example plugin for Hyrise. It can be used as a basis for the development of further plugins.
+This repository contains an example plugin for Hyrise. It can be used as a basis for the development of further plugins. The plugin is introduced in our paper: Hyrise Re-engineered: An Extensible Database System for Research in Relational In-Memory Data Management.
 
 ## Development
 
@@ -15,7 +15,3 @@ This repository contains an example plugin for Hyrise. It can be used as a basis
 1. Test your plugin, for example, using the Hyrise Console (from the main directory):
     - `./cmake-build-debug/hyriseConsole`
     - `load_plugin cmake-build-debug/libExamplePlugin.dylib`
-
-
-- formatting and linting
-- build process CI
