@@ -14,3 +14,7 @@ size_t predict_index_size(const std::string& table_name, opossum::ColumnID colum
 
   return index_size;
 }
+
+std::ostream &operator<<(std::ostream& os, const TableColumnIdentifier& identifier) {
+    return os << identifier.table_name << "_" << identifier.column_id;
+}

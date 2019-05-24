@@ -9,6 +9,8 @@
 
 namespace opossum {
 
+const size_t BUDGET = 30'000'000;
+
 class Driver : public AbstractPlugin, public Singleton<Driver> {
  public:
   const std::string description() const final;

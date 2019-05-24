@@ -89,7 +89,7 @@ void WorkloadPredictor::_process_table_scan(std::shared_ptr<const AbstractOperat
             // const auto table_id = _table_name_id_map.left.at(table_name);
 
             const auto original_column_id = column_reference.original_column_id();
-            const auto identifier = std::make_pair(table_name, original_column_id);
+            const auto identifier = TableColumnIdentifier(table_name, original_column_id);
             const auto& perf_data = op->performance_data();
 
             const auto scan_access = ScanAccess(perf_data.walltime, perf_data.timestamp, perf_data.input_rows_left, perf_data.output_rows);

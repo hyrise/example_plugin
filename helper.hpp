@@ -38,14 +38,27 @@ struct ColumnAccesses {
   std::vector<ScanAccess> scan_accesses;
 };
 
-using TableColumnIdentifier = std::pair<std::string, opossum::ColumnID>;
+struct TableColumnIdentifier {
+  std::string table_name;
+  opossum::ColumnID column_id;
 
+  TableColumnIdentifier(const std::string& table_name, const opossum::ColumnID column_id) : table_name(table_name), column_id(column_id) {}
+
+  bool operator== (const TableColumnIdentifier& rhs) const {
+    const std::string combined_lhs = this->table_name + "_" + std::to_string(this->column_id);
+    const std::string combined_rhs = rhs.table_name + "_" + std::to_string(rhs.column_id);
+
+    return combined_lhs == combined_rhs;
+  }
+};
+
+std::ostream &operator<<(std::ostream& os, const TableColumnIdentifier& identifier);
 
 namespace std {
 template <>
 struct hash<TableColumnIdentifier> {
-  size_t operator()(TableColumnIdentifier const& v) const {
-    const std::string combined = v.first + "_" + std::to_string(v.second);
+  size_t operator()(TableColumnIdentifier const& id) const {
+    const std::string combined = id.table_name + "_" + std::to_string(id.column_id);
     return std::hash<std::string>{}(combined);
   }
 };
@@ -68,6 +81,15 @@ class Workload {
 
   ColumnAccesses get_column_accesses(const TableColumnIdentifier& identifier) const {
     return _accesses.at(identifier);
+  }
+
+  // Only for debugging
+  std::unordered_map<TableColumnIdentifier, ColumnAccesses> get_accesses() const {
+    return _accesses;
+  }
+
+  bool contains_accesses(const TableColumnIdentifier& identifier) const {
+    return _accesses.count(identifier) > 0;
   }
 
  private:
