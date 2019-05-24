@@ -6,6 +6,7 @@ const std::string Driver::description() const { return "This is the Hyrise Drive
 
 void Driver::start() {
   const auto forecasted_workload = _wp.get_forecasts();
+  _it.create_indexes_for_workload(forecasted_workload);
 }
 
 void Driver::stop() { }

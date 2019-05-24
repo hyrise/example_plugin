@@ -11,8 +11,8 @@
 
 namespace opossum {
 
-typedef boost::bimap<std::string, uint16_t> table_name_id_bimap;
-typedef table_name_id_bimap::value_type table_name_id;
+// typedef boost::bimap<std::string, uint16_t> table_name_id_bimap;
+// typedef table_name_id_bimap::value_type table_name_id;
 
 class WorkloadPredictor {
  public:
@@ -20,8 +20,8 @@ class WorkloadPredictor {
   const Workload get_forecasts();
  private:
   StorageManager& _sm;
-  table_name_id_bimap _table_name_id_map;
-  std::unordered_map<TableColumnIdentifier, std::string> _attribute_id_name_map;
+  // table_name_id_bimap _table_name_id_map;
+  // std::unordered_map<TableColumnIdentifier, std::string> _attribute_id_name_map;
 
   void _update_table_metadata();
   const Workload _calculate_forecast() const;

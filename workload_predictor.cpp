@@ -86,10 +86,10 @@ void WorkloadPredictor::_process_table_scan(std::shared_ptr<const AbstractOperat
           if (original_node->type == LQPNodeType::StoredTable) {
             const auto stored_table_node = std::dynamic_pointer_cast<const StoredTableNode>(original_node);
             const auto& table_name = stored_table_node->table_name;
-            const auto table_id = _table_name_id_map.left.at(table_name);
+            // const auto table_id = _table_name_id_map.left.at(table_name);
 
             const auto original_column_id = column_reference.original_column_id();
-            const auto identifier = std::make_pair(table_id, original_column_id);
+            const auto identifier = std::make_pair(table_name, original_column_id);
             const auto& perf_data = op->performance_data();
 
             const auto scan_access = ScanAccess(perf_data.walltime, perf_data.timestamp, perf_data.input_rows_left, perf_data.output_rows);
@@ -126,7 +126,7 @@ const Workload WorkloadPredictor::_calculate_forecast() const {
 }
 
 const Workload WorkloadPredictor::get_forecasts() {
-  _update_table_metadata();
+  // _update_table_metadata();
   _last_workload = Workload();
 
   for (const auto& [query_string, physical_query_plan] : SQLPhysicalPlanCache::get()) {
@@ -139,24 +139,24 @@ const Workload WorkloadPredictor::get_forecasts() {
   return forecasted_workload;
 }
 
-void WorkloadPredictor::_update_table_metadata() {
-  // ToDo: Clear
-  // ToDo: Step 2 Don't clear, but add new
+// void WorkloadPredictor::_update_table_metadata() {
+//   // ToDo: Clear
+//   // ToDo: Step 2 Don't clear, but add new
 
-  uint16_t next_table_id = 0;
-  for (const auto& table_name : _sm.table_names()) {
-    _table_name_id_map.insert(table_name_id(table_name, next_table_id));
+//   uint16_t next_table_id = 0;
+//   for (const auto& table_name : _sm.table_names()) {
+//     _table_name_id_map.insert(table_name_id(table_name, next_table_id));
 
-    auto next_attribute_id = 0;
-    const auto table = StorageManager::get().get_table(table_name);
-    for (const auto& column_def : table->column_definitions()) {
-      const auto& column_name = column_def.name;
-      const auto identifier = std::make_pair(next_table_id, next_attribute_id++);
-      _attribute_id_name_map.emplace(identifier, column_name);
-    }
+//     auto next_attribute_id = 0;
+//     const auto table = StorageManager::get().get_table(table_name);
+//     for (const auto& column_def : table->column_definitions()) {
+//       const auto& column_name = column_def.name;
+//       const auto identifier = std::make_pair(table_name, next_attribute_id++);
+//       _attribute_id_name_map.emplace(identifier, column_name);
+//     }
 
-    ++next_table_id;
-  }
-}
+//     ++next_table_id;
+//   }
+// }
 
 }  // namespace opossum
