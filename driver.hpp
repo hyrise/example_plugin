@@ -4,6 +4,8 @@
 #include "utils/abstract_plugin.hpp"
 #include "utils/singleton.hpp"
 
+#include "workload_predictor.hpp"
+
 namespace opossum {
 
 class Driver : public AbstractPlugin, public Singleton<Driver> {
@@ -17,6 +19,9 @@ class Driver : public AbstractPlugin, public Singleton<Driver> {
   void stop() final;
 
   StorageManager& sm;
+
+ private:
+  WorkloadPredictor _wp;
 };
 
 }  // namespace opossum
