@@ -111,7 +111,6 @@ void WorkloadPredictor::_process_pqp(std::shared_ptr<const AbstractOperator> op)
              op->type() == OperatorType::JoinNestedLoop || op->type() == OperatorType::JoinSortMerge) {
     _process_join(op);
   } else {
-    std::cout << "Skipping this node. Not a Scan or Join." << std::endl;
   }
 
   if (op->input_left()) _process_pqp(op->input_left());

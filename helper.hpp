@@ -103,6 +103,8 @@ public:
   AbstractCandidate(TableColumnIdentifier identifier) : identifier(identifier) {}
 };
 
+std::ostream &operator<<(std::ostream& os, const AbstractCandidate& candidate);
+
 class IndexCandidate : public AbstractCandidate {
 public:
   IndexCandidate(TableColumnIdentifier identifier_sub) : AbstractCandidate(identifier_sub) {}

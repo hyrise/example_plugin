@@ -2,6 +2,7 @@
 
 #include <numeric>
 
+#include "storage/index/group_key/group_key_index.hpp"
 #include "storage/storage_manager.hpp"
 #include "storage/table.hpp"
 
@@ -10,7 +11,20 @@ namespace opossum {
 void IndexTuner::create_indexes_for_workload(const Workload& workload, size_t budget) const {
   auto index_candidates = _enumerate_index_candidates();
   auto index_assessments = _assess_index_candidates(workload, index_candidates);
-  auto index_choices = select_assessments_greedy(index_assessments, budget);
+  auto index_choices = _select_assessments_greedily(index_assessments, budget);
+  _initialize_indexes(index_choices);
+}
+
+void IndexTuner::_initialize_indexes(const std::vector<AbstractCandidate>& index_choices) const {
+  for (const auto& index_choice : index_choices) {
+    const auto& table_name = index_choice.identifier.table_name;
+    const auto column_id = index_choice.identifier.column_id;
+    const auto table = StorageManager::get().get_table(table_name);
+    const std::string index_name = "idx_" + table_name + "_" + std::to_string(column_id);
+
+    table->create_index<GroupKeyIndex>({column_id}, index_name);
+    std::cout << "Created index on: " << index_choice.identifier << std::endl;
+  }
 }
 
 size_t sum_input_rows(size_t lhs, const ScanAccess& rhs) {
@@ -24,7 +38,7 @@ bool compareByDesirabilityPerCost(const AbstractCandidateAssessment& assessment_
   return desirability_per_cost_1 > desirability_per_cost_2;
 }
 
-std::vector<AbstractCandidate> IndexTuner::select_assessments_greedy(std::vector<AbstractCandidateAssessment>& assessments, size_t budget) const {
+std::vector<AbstractCandidate> IndexTuner::_select_assessments_greedily(std::vector<AbstractCandidateAssessment>& assessments, size_t budget) const {
   std::vector<AbstractCandidate> selected_candidates;
   size_t used_budget = 0;
 

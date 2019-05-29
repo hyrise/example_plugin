@@ -17,7 +17,9 @@ class IndexTuner {
   std::vector<AbstractCandidateAssessment> _assess_index_candidates(const Workload& workload, std::vector<IndexCandidate>& index_candidates) const;
 
   // This selector greedily selects assessed items based on desirability per cost
-  std::vector<AbstractCandidate> select_assessments_greedy(std::vector<AbstractCandidateAssessment>& assessments, size_t budget) const;
+  std::vector<AbstractCandidate> _select_assessments_greedily(std::vector<AbstractCandidateAssessment>& assessments, size_t budget) const;
+
+  void _initialize_indexes(const std::vector<AbstractCandidate>& index_choices) const;
 };
 
 }  // namespace opossum
