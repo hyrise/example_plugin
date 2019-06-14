@@ -9,7 +9,7 @@
 
 namespace opossum {
 
-const size_t BUDGET = 9'000'000'000;
+constexpr size_t BUDGET = 74'000'000;
 
 class Driver : public AbstractPlugin, public Singleton<Driver> {
  public:

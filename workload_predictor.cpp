@@ -13,7 +13,7 @@
 
 namespace opossum {
 
-void WorkloadPredictor::_process_join(std::shared_ptr<const AbstractOperator> op) {
+void WorkloadPredictor::_process_join(std::shared_ptr<const AbstractOperator> op, size_t frequency) {
     // const auto node = op->lqp_node();
     // const auto join_node = std::dynamic_pointer_cast<const JoinNode>(node);
 
@@ -70,7 +70,7 @@ void WorkloadPredictor::_process_join(std::shared_ptr<const AbstractOperator> op
 }
 
 
-void WorkloadPredictor::_process_table_scan(std::shared_ptr<const AbstractOperator> op) {
+void WorkloadPredictor::_process_index_scan(std::shared_ptr<const AbstractOperator> op, size_t frequency) {
   const auto node = op->lqp_node();
   const auto predicate_node = std::dynamic_pointer_cast<const PredicateNode>(node);
   const auto operator_predicates = OperatorScanPredicate::from_expression(*predicate_node->predicate(), *node);
@@ -92,8 +92,11 @@ void WorkloadPredictor::_process_table_scan(std::shared_ptr<const AbstractOperat
             const auto identifier = TableColumnIdentifier(table_name, original_column_id);
             const auto& perf_data = op->performance_data();
 
-            const auto scan_access = ScanAccess(perf_data.walltime, perf_data.timestamp, perf_data.input_rows_left, perf_data.output_rows);
-            _last_workload.add_access(identifier, scan_access);
+            // ToDo: This is a hack to only get the columns that can actually be indexed with the current rule. Change with better index rule
+            if (original_node == node->left_input()) {
+              const auto scan_access = ScanAccess(frequency * perf_data.walltime, perf_data.timestamp, frequency * perf_data.input_rows_left, frequency * perf_data.output_rows);
+              _last_workload.add_access(identifier, scan_access);
+            }
           }
         }
         return ExpressionVisitation::VisitArguments;
@@ -102,19 +105,58 @@ void WorkloadPredictor::_process_table_scan(std::shared_ptr<const AbstractOperat
   }
 }
 
-void WorkloadPredictor::_process_pqp(std::shared_ptr<const AbstractOperator> op) {
+void WorkloadPredictor::_process_table_scan(std::shared_ptr<const AbstractOperator> op, size_t frequency) {
+  const auto node = op->lqp_node();
+  const auto predicate_node = std::dynamic_pointer_cast<const PredicateNode>(node);
+  const auto operator_predicates = OperatorScanPredicate::from_expression(*predicate_node->predicate(), *node);
+  
+  if (operator_predicates->size() < 2) {
+    for (const auto& el : node->node_expressions) {
+      visit_expression(el, [&](const auto& expression) {
+        if (expression->type == ExpressionType::LQPColumn) {
+          const auto column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(expression);
+          const auto column_reference = column_expression->column_reference;
+          const auto original_node = column_reference.original_node();
+
+          if (original_node->type == LQPNodeType::StoredTable) {
+            const auto stored_table_node = std::dynamic_pointer_cast<const StoredTableNode>(original_node);
+            const auto& table_name = stored_table_node->table_name;
+            // const auto table_id = _table_name_id_map.left.at(table_name);
+
+            const auto original_column_id = column_reference.original_column_id();
+            const auto identifier = TableColumnIdentifier(table_name, original_column_id);
+            const auto& perf_data = op->performance_data();
+
+            // ToDo: This is a hack to only get the columns that can actually be indexed with the current rule. Change with better index rule
+            if (original_node == node->left_input()) {
+              // std::cout << identifier << " " << std::to_string(perf_data.input_rows_left) << std::endl;
+              const auto scan_access = ScanAccess(frequency * perf_data.walltime, perf_data.timestamp, frequency * perf_data.input_rows_left, frequency * perf_data.output_rows);
+              _last_workload.add_access(identifier, scan_access);
+            }
+          }
+        }
+        return ExpressionVisitation::VisitArguments;
+      });
+    }
+  }
+}
+
+void WorkloadPredictor::_process_pqp(std::shared_ptr<const AbstractOperator> op, size_t frequency) {
   // TODO: handle diamonds
   // Todo: handle index scans/joins
+  // TODO frequency should be used here not in the methods themselves
   if (op->type() == OperatorType::TableScan) {
-    _process_table_scan(op);
+    _process_table_scan(op, frequency);
   } else if (op->type() == OperatorType::JoinHash || op->type() == OperatorType::JoinMPSM ||
              op->type() == OperatorType::JoinNestedLoop || op->type() == OperatorType::JoinSortMerge) {
-    _process_join(op);
+    _process_join(op, frequency);
+  } else if (op->type() == OperatorType::IndexScan) {
+    _process_index_scan(op, frequency);
   } else {
   }
 
-  if (op->input_left()) _process_pqp(op->input_left());
-  if (op->input_right()) _process_pqp(op->input_right());
+  if (op->input_left()) _process_pqp(op->input_left(), frequency);
+  if (op->input_right()) _process_pqp(op->input_right(), frequency);
 }
 
 // This first workload predictor version forecasts that the future workload will exactly look like the previous one
@@ -129,7 +171,8 @@ const Workload WorkloadPredictor::get_forecasts() {
   _last_workload = Workload();
 
   for (const auto& [query_string, physical_query_plan] : SQLPhysicalPlanCache::get()) {
-    _process_pqp(physical_query_plan);
+    size_t frequency = SQLPhysicalPlanCache::get().get_frequency(query_string);
+    _process_pqp(physical_query_plan, frequency);
     // physical_query_plan->print(std::cout);
   }
 

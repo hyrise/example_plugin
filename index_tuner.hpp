@@ -8,7 +8,7 @@ namespace opossum {
 
 class IndexTuner {
  public:
-  void create_indexes_for_workload(const Workload& workload, size_t budget) const;
+  void create_indexes_for_workload(const Workload& workload, size_t budget);
  private:
   // This enumerator considers all columns except these of tables that have less than 10'000 * SCALE_FACTOR rows
   std::vector<IndexCandidate> _enumerate_index_candidates() const;
@@ -19,7 +19,9 @@ class IndexTuner {
   // This selector greedily selects assessed items based on desirability per cost
   std::vector<AbstractCandidate> _select_assessments_greedily(std::vector<AbstractCandidateAssessment>& assessments, size_t budget) const;
 
-  void _initialize_indexes(const std::vector<AbstractCandidate>& index_choices) const;
+  void _initialize_indexes(const std::vector<AbstractCandidate>& index_choices);
+
+  std::vector<TableColumnIdentifier> _current_index_identifiers;
 };
 
 }  // namespace opossum

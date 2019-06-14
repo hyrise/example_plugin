@@ -8,6 +8,8 @@ add_subdirectory(hyrise/)                                                       
 include_directories(                                                                                #
     ${PROJECT_SOURCE_DIR}/hyrise/src/lib/                                                           #
     ${PROJECT_SOURCE_DIR}/hyrise/third_party/sql-parser/src                                         #
+    ${PROJECT_SOURCE_DIR}/hyrise/third_party/json                                                   #
+    ${PROJECT_SOURCE_DIR}/hyrise/third_party/cxxopts/include                                        #
     ${TBB_INCLUDE_DIR}                                                                              #
     ${Boost_INCLUDE_DIRS}                                                                           #
 )                                                                                                   #

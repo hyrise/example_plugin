@@ -25,9 +25,10 @@ class WorkloadPredictor {
 
   void _update_table_metadata();
   const Workload _calculate_forecast() const;
-  void _process_table_scan(std::shared_ptr<const AbstractOperator> op);
-  void _process_join(std::shared_ptr<const AbstractOperator> op);
-  void _process_pqp(std::shared_ptr<const AbstractOperator> op);
+  void _process_table_scan(std::shared_ptr<const AbstractOperator> op, size_t frequency);
+  void _process_index_scan(std::shared_ptr<const AbstractOperator> op, size_t frequency);
+  void _process_join(std::shared_ptr<const AbstractOperator> op, size_t frequency);
+  void _process_pqp(std::shared_ptr<const AbstractOperator> op, size_t frequency);
 
   Workload _last_workload;
 };

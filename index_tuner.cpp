@@ -8,15 +8,23 @@
 
 namespace opossum {
 
-void IndexTuner::create_indexes_for_workload(const Workload& workload, size_t budget) const {
+void IndexTuner::create_indexes_for_workload(const Workload& workload, size_t budget) {
   auto index_candidates = _enumerate_index_candidates();
   auto index_assessments = _assess_index_candidates(workload, index_candidates);
   auto index_choices = _select_assessments_greedily(index_assessments, budget);
   _initialize_indexes(index_choices);
 }
 
-void IndexTuner::_initialize_indexes(const std::vector<AbstractCandidate>& index_choices) const {
+void IndexTuner::_initialize_indexes(const std::vector<AbstractCandidate>& index_choices) {
+  std::vector<TableColumnIdentifier> new_index_identifiers;
+
   for (const auto& index_choice : index_choices) {
+    if (std::find(_current_index_identifiers.cbegin(), _current_index_identifiers.cend(), index_choice.identifier) != _current_index_identifiers.cend()) {
+      std::cout << "Index already present: " << index_choice.identifier << std::endl;
+      new_index_identifiers.push_back(index_choice.identifier);
+      continue;
+    }
+
     const auto& table_name = index_choice.identifier.table_name;
     const auto column_id = index_choice.identifier.column_id;
     const auto table = StorageManager::get().get_table(table_name);
@@ -24,7 +32,20 @@ void IndexTuner::_initialize_indexes(const std::vector<AbstractCandidate>& index
 
     table->create_index<GroupKeyIndex>({column_id}, index_name);
     std::cout << "Created index on: " << index_choice.identifier << std::endl;
+    new_index_identifiers.push_back(index_choice.identifier);
   }
+
+  for (const auto& old_index_identifer : _current_index_identifiers) {
+    if (std::find(new_index_identifiers.cbegin(), new_index_identifiers.cend(), old_index_identifer) == new_index_identifiers.cend()) {
+      const auto& table_name = old_index_identifer.table_name;
+      const auto column_id = old_index_identifer.column_id;
+      const auto table = StorageManager::get().get_table(table_name);
+      table->remove_index({column_id});
+
+      std::cout << "Dropped index on: " << old_index_identifer << std::endl;
+    }
+  }
+  _current_index_identifiers = new_index_identifiers;
 }
 
 size_t sum_input_rows(size_t lhs, const ScanAccess& rhs) {
@@ -69,6 +90,8 @@ std::vector<AbstractCandidateAssessment> IndexTuner::_assess_index_candidates(co
     const auto& table_name = identifier.table_name;
     const auto& column_id = identifier.column_id;
     index_candidate_assessments.emplace_back(std::make_shared<IndexCandidate>(index_candidate), static_cast<float>(total_processed_rows), static_cast<float>(predict_index_size(table_name, column_id)));
+
+    // std::cout << table_name << " " << std::to_string(column_id) << " " << std::to_string(total_processed_rows) << " " << std::to_string(predict_index_size(table_name, column_id)) << std::endl;
   }
 
   return index_candidate_assessments;
@@ -80,7 +103,7 @@ std::vector<IndexCandidate> IndexTuner::_enumerate_index_candidates() const {
   uint16_t next_table_id = 0;
   for (const auto& table_name : StorageManager::get().table_names()) {
     const auto table = StorageManager::get().get_table(table_name);
-    if (table->row_count() >= (1'000)) {
+    if (table->row_count() >= (20'000)) {
       ColumnID next_attribute_id{0};
       for ([[maybe_unused]] const auto& column_def : table->column_definitions()) {
         const TableColumnIdentifier identifier = TableColumnIdentifier(table_name, next_attribute_id);
@@ -88,7 +111,7 @@ std::vector<IndexCandidate> IndexTuner::_enumerate_index_candidates() const {
         index_candidates.emplace_back(identifier);
       }
     } else {
-      std::cout << "Not considering columns of: " << table_name << " as candidates." << std::endl;
+      // std::cout << "Not considering columns of: " << table_name << " as candidates because of the table's size." << std::endl;
     }
 
     ++next_table_id;
