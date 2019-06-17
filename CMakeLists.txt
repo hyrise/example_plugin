@@ -26,3 +26,4 @@ add_compile_options(-std=c++17 -pthread -Wall -Wextra -pedantic -Werror -Wno-unu
 ### Modify this line to add your own plugin
 add_plugin(NAME ExamplePlugin SRCS example_plugin.cpp example_plugin.hpp DEPS hyriseConsole)
 add_plugin(NAME Driver SRCS driver.cpp driver.hpp workload_predictor.cpp workload_predictor.hpp index_tuner.cpp index_tuner.hpp helper.cpp helper.hpp DEPS hyriseConsole hyriseServer hyrisePlayground)
+add_plugin(NAME DriverAdvanced SRCS driver_advanced.cpp driver_advanced.hpp workload_predictor.cpp workload_predictor.hpp index_tuner_advanced.cpp index_tuner_advanced.hpp helper.cpp helper.hpp DEPS hyriseConsole hyriseServer hyrisePlayground)
