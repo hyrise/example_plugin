@@ -91,7 +91,7 @@ std::vector<AbstractCandidateAssessment> IndexTuner::_assess_index_candidates(co
     const auto& column_id = identifier.column_id;
     index_candidate_assessments.emplace_back(std::make_shared<IndexCandidate>(index_candidate), static_cast<float>(total_processed_rows), static_cast<float>(predict_index_size(table_name, column_id)));
 
-    // std::cout << table_name << " " << std::to_string(column_id) << " " << std::to_string(total_processed_rows) << " " << std::to_string(predict_index_size(table_name, column_id)) << std::endl;
+    std::cout << table_name << " " << std::to_string(column_id) << " " << std::to_string(total_processed_rows) << " " << std::to_string(predict_index_size(table_name, column_id)) << std::endl;
   }
 
   return index_candidate_assessments;
@@ -111,7 +111,7 @@ std::vector<IndexCandidate> IndexTuner::_enumerate_index_candidates() const {
         index_candidates.emplace_back(identifier);
       }
     } else {
-      // std::cout << "Not considering columns of: " << table_name << " as candidates because of the table's size." << std::endl;
+      std::cout << "Not considering columns of: " << table_name << " as candidates because of the table's size." << std::endl;
     }
 
     ++next_table_id;

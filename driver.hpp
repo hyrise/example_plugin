@@ -21,6 +21,8 @@ class Driver : public AbstractPlugin, public Singleton<Driver> {
  private:
   IndexTuner _it;
   WorkloadPredictor _wp;
+  bool _run = true;
+  std::shared_ptr<std::thread> _main_thread;
 };
 
 }  // namespace opossum
