@@ -111,7 +111,7 @@ std::vector<IndexCandidate> IndexTuner::_enumerate_index_candidates() const {
         index_candidates.emplace_back(identifier);
       }
     } else {
-      std::cout << "Not considering columns of: " << table_name << " as candidates because of the table's size." << std::endl;
+      // std::cout << "Not considering columns of: " << table_name << " as candidates because of the table's size." << std::endl;
     }
 
     ++next_table_id;

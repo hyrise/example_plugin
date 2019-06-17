@@ -7,10 +7,17 @@
 
 namespace opossum {
 
+constexpr int64_t START_BUDGET = 74'000'000;
+
 const std::string Driver::description() const { return "This is the Hyrise Driver"; }
 
-void Driver::start() {
+void Driver::_init() {
   _run = true;
+  _settings["Budget"] = AllTypeVariant{START_BUDGET};
+}
+
+void Driver::start() {
+  _init();
 
   _main_thread = std::make_shared<std::thread>(([=]() {
     while (_run) {
@@ -27,7 +34,7 @@ void Driver::start() {
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
           const auto forecasted_workload = _wp.get_forecasts();
-          _it.create_indexes_for_workload(forecasted_workload, BUDGET);
+          _it.create_indexes_for_workload(forecasted_workload, static_cast<size_t>(boost::get<int64_t>(_settings["Budget"])));
           SQLPhysicalPlanCache::get().clear();
           SQLLogicalPlanCache::get().clear();
 
@@ -45,6 +52,11 @@ void Driver::stop() {
   _main_thread->join();
 
   delete &Driver::get();
+}
+
+void Driver::update_setting(const std::string& key, const AllTypeVariant& value) {
+  std::cout << key << " was set to: " << value << std::endl;
+  _settings[key] = value;
 }
 
 EXPORT_PLUGIN(Driver)

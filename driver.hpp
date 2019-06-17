@@ -9,8 +9,6 @@
 
 namespace opossum {
 
-constexpr size_t BUDGET = 74'000'000;
-
 class Driver : public AbstractPlugin, public Singleton<Driver> {
  public:
   const std::string description() const final;
@@ -18,11 +16,15 @@ class Driver : public AbstractPlugin, public Singleton<Driver> {
   void start() final;
 
   void stop() final;
+
+  void update_setting(const std::string& key, const AllTypeVariant& value);
  private:
   IndexTuner _it;
   WorkloadPredictor _wp;
   bool _run = true;
   std::shared_ptr<std::thread> _main_thread;
+
+  void _init();
 };
 
 }  // namespace opossum
