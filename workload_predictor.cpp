@@ -94,7 +94,7 @@ void WorkloadPredictor::_process_index_scan(std::shared_ptr<const AbstractOperat
 
             // ToDo: This is a hack to only get the columns that can actually be indexed with the current rule. Change with better index rule
             if (original_node == node->left_input()) {
-              const auto scan_access = ScanAccess(frequency * perf_data.walltime, perf_data.timestamp, frequency * perf_data.input_rows_left, frequency * perf_data.output_rows);
+              const auto scan_access = ScanAccess(perf_data.walltime, perf_data.timestamp, frequency, perf_data.input_rows_left, perf_data.output_rows);
               _last_workload.add_access(identifier, scan_access);
             }
           }
@@ -130,7 +130,7 @@ void WorkloadPredictor::_process_table_scan(std::shared_ptr<const AbstractOperat
             // ToDo: This is a hack to only get the columns that can actually be indexed with the current rule. Change with better index rule
             if (original_node == node->left_input()) {
               // std::cout << identifier << " " << std::to_string(perf_data.input_rows_left) << std::endl;
-              const auto scan_access = ScanAccess(frequency * perf_data.walltime, perf_data.timestamp, frequency * perf_data.input_rows_left, frequency * perf_data.output_rows);
+              const auto scan_access = ScanAccess(perf_data.walltime, perf_data.timestamp, frequency, perf_data.input_rows_left, perf_data.output_rows);
               _last_workload.add_access(identifier, scan_access);
             }
           }

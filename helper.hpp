@@ -14,8 +14,9 @@ class OperatorAccess {
  public:
   std::chrono::nanoseconds execution_time;
   std::time_t execution_timestamp;
+  size_t frequency;
 
-  OperatorAccess(std::chrono::nanoseconds execution_time, std::time_t execution_timestamp) : execution_time(execution_time), execution_timestamp(execution_timestamp) {}
+  OperatorAccess(std::chrono::nanoseconds execution_time, std::time_t execution_timestamp, size_t frequency) : execution_time(execution_time), execution_timestamp(execution_timestamp), frequency(frequency) {}
 };
 
 class JoinAccess : public OperatorAccess {
@@ -30,7 +31,7 @@ class ScanAccess : public OperatorAccess {
   size_t input_rows;
   size_t output_rows;
 
-  ScanAccess(std::chrono::nanoseconds execution_time, std::time_t execution_timestamp, size_t input_rows, size_t output_rows) : OperatorAccess(execution_time, execution_timestamp), input_rows(input_rows), output_rows(output_rows) {}
+  ScanAccess(std::chrono::nanoseconds execution_time, std::time_t execution_timestamp, size_t frequency, size_t input_rows, size_t output_rows) : OperatorAccess(execution_time, execution_timestamp, frequency), input_rows(input_rows), output_rows(output_rows) {}
 };
 
 struct ColumnAccesses {

@@ -49,7 +49,7 @@ void IndexTuner::_initialize_indexes(const std::vector<AbstractCandidate>& index
 }
 
 size_t sum_input_rows(size_t lhs, const ScanAccess& rhs) {
-  return lhs + rhs.input_rows;
+  return lhs + (rhs.input_rows * rhs.frequency);
 }
 
 bool compareByDesirabilityPerCost(const AbstractCandidateAssessment& assessment_1, const AbstractCandidateAssessment& assessment_2) {
@@ -91,7 +91,7 @@ std::vector<AbstractCandidateAssessment> IndexTuner::_assess_index_candidates(co
     const auto& column_id = identifier.column_id;
     index_candidate_assessments.emplace_back(std::make_shared<IndexCandidate>(index_candidate), static_cast<float>(total_processed_rows), static_cast<float>(predict_index_size(table_name, column_id)));
 
-    std::cout << table_name << " " << std::to_string(column_id) << " " << std::to_string(total_processed_rows) << " " << std::to_string(predict_index_size(table_name, column_id)) << std::endl;
+    std::cout << table_name << " " << std::to_string(column_id) << " Rows Processed: " << std::to_string(total_processed_rows) << " Predicted Index Size: " << std::to_string(predict_index_size(table_name, column_id)) << std::endl;
   }
 
   return index_candidate_assessments;
