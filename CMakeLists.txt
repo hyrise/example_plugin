@@ -12,6 +12,7 @@ include_directories(                                                            
     ${PROJECT_SOURCE_DIR}/hyrise/third_party/cxxopts/include                                        #
     ${TBB_INCLUDE_DIR}                                                                              #
     ${Boost_INCLUDE_DIRS}                                                                           #
+    ${CMAKE_BINARY_DIR}                                                                             #
 )                                                                                                   #
                                                                                                     #
 add_definitions(-DBOOST_THREAD_VERSION=5)                                                           #
