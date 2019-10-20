@@ -17,27 +17,29 @@ void Driver::_init() {
 }
 
 void Driver::start() {
-  _init();
+  
+  // const auto scale_factor = 0.01f;
 
-  _main_thread = std::make_shared<std::thread>(([=]() {
-    while (_run) {
-      std::cout << "Driver running" << std::endl;
-      if (SQLPhysicalPlanCache::get().size() >= 1) {
-        std::cout << "Driver Optimizing" << std::endl;
-        StorageManager::get().get_server()->toggle_dont_accept_next_connection();
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  // std::shared_ptr<BenchmarkConfig> config;
+  // auto context = BenchmarkRunner::create_context(*config);
 
-        const auto forecasted_workload = _wp.get_forecasts();
-        _it.create_indexes_for_workload(forecasted_workload, static_cast<size_t>(boost::get<int64_t>(_settings["Budget"])));
-        SQLPhysicalPlanCache::get().clear();
-        SQLLogicalPlanCache::get().clear();
+  // Run the benchmark
+  // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, use_prepared_statements, scale_factor, item_ids);
+  // BenchmarkRunner(*config, std::move(item_runner), std::make_unique<TpchTableGenerator>(scale_factor, config), context)
+  //     .run();
 
-        StorageManager::get().get_server()->toggle_dont_accept_next_connection();
-      }
+  if (SQLPhysicalPlanCache::get().size() >= 1) {
+    const auto forecasted_workload = _wp.get_forecasts();
+    // StorageManager::get().get_server()->toggle_dont_accept_next_connection();
+    // std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-      std::this_thread::sleep_for(std::chrono::milliseconds(5'000));
-    }
-  }));
+    
+    // _it.create_indexes_for_workload(forecasted_workload, static_cast<size_t>(boost::get<int64_t>(_settings["Budget"])));
+    // SQLPhysicalPlanCache::get().clear();
+    // SQLLogicalPlanCache::get().clear();
+
+    // StorageManager::get().get_server()->toggle_dont_accept_next_connection();
+  }
 }
 
 void Driver::stop() {
