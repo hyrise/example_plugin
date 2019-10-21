@@ -164,7 +164,9 @@ std::string WorkloadPredictor::_process_table_scan(std::shared_ptr<const Abstrac
           const auto original_column_id = column_reference.original_column_id();
           const auto identifier = TableColumnIdentifier(table_name, original_column_id);
           const auto& perf_data = op->performance_data();
-          const auto description = op->lqp_node()->description();
+          auto description = op->description();
+          description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
+          description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
 
           auto& sm = StorageManager::get();
           const auto sm_table = sm.get_table(table_name);
