@@ -1,6 +1,8 @@
 # Hyrise Example Plugin
 
 This repository contains an example plugin for [Hyrise](https://github.com/hyrise/hyrise "Hyrise on GitHub"). It can be used as a basis for the development of further plugins.
+The plugin is introduced in our paper "Hyrise Re-engineered: An Extensible Database System for Research in Relational In-Memory Data Management" (EDBT 2019, Dreseler et al.).
+
 
 ## Development
 
