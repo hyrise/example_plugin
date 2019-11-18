@@ -1,6 +1,6 @@
 # Hyrise Example Plugin
 
-This repository contains an example plugin for Hyrise. It can be used as a basis for the development of further plugins.
+This repository contains an example plugin for [Hyrise](https://github.com/hyrise/hyrise "Hyrise on GitHub"). It can be used as a basis for the development of further plugins.
 
 ## Development
 
