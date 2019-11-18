@@ -1,5 +1,7 @@
 # Usually, you should not have to touch the following part ##########################################
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)                                                     #
+cmake_minimum_required(VERSION 3.9 FATAL_ERROR)                                                     #
+                                                                                                    #
+project("Hyrise Example Plugin")                                                                    #
                                                                                                     #
 # Include CMakeLists.txt of Hyrise (all the build magic is contained there)                         #
 add_subdirectory(hyrise/)                                                                           #
