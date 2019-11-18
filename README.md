@@ -15,7 +15,3 @@ This repository contains an example plugin for [Hyrise](https://github.com/hyris
 1. Test your plugin, for example, using the Hyrise Console (from the main directory):
     - `./cmake-build-debug/hyriseConsole`
     - `load_plugin cmake-build-debug/libExamplePlugin.dylib`
-
-
-- formatting and linting
-- build process CI
