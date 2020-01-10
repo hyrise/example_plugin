@@ -27,4 +27,4 @@ add_compile_options(-std=c++17 -pthread -Wall -Wextra -pedantic -Werror -Wno-unu
 
 
 ### Modify this line to add your own plugin
-add_plugin(NAME PlanCacheToCSVExporter SRCS plan_cache_csv_exporter.cpp plan_cache_csv_exporter.hpp workload_predictor.cpp workload_predictor.hpp index_tuner.cpp index_tuner.hpp helper.cpp helper.hpp DEPS hyriseConsole hyriseServer hyrisePlayground)
+add_plugin(NAME Driver SRCS driver.cpp driver.hpp plan_cache_csv_exporter.cpp plan_cache_csv_exporter.hpp DEPS hyriseConsole hyriseServer hyrisePlayground)
