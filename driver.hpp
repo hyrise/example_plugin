@@ -1,10 +1,7 @@
 #pragma once
 
-#include "hyrise.hpp"
 #include "utils/abstract_plugin.hpp"
 #include "utils/singleton.hpp"
-
-#include "plan_cache_csv_exporter.hpp"
 
 namespace opossum {
 

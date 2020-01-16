@@ -1,5 +1,8 @@
+# BenchmarkLib disables unity for TPC-DS. Let's try the same here.
+set(CMAKE_UNITY_BUILD "OFF")
+
 # Usually, you should not have to touch the following part ##########################################
-cmake_minimum_required(VERSION 3.9 FATAL_ERROR)                                                     #
+cmake_minimum_required(VERSION 3.16 FATAL_ERROR)                                                    #
                                                                                                     #
 project("Hyrise Example Plugin")                                                                    #
                                                                                                     #
@@ -9,12 +12,18 @@ add_subdirectory(hyrise/)                                                       
 # Add hyrise sources to be able to include headers                                                  #
 include_directories(                                                                                #
     ${PROJECT_SOURCE_DIR}/hyrise/src/lib/                                                           #
+    ${PROJECT_SOURCE_DIR}/hyrise/src/benchmarklib/                                                  #
     ${PROJECT_SOURCE_DIR}/hyrise/third_party/sql-parser/src                                         #
-    ${PROJECT_SOURCE_DIR}/hyrise/third_party/json                                                   #
     ${PROJECT_SOURCE_DIR}/hyrise/third_party/cxxopts/include                                        #
     ${TBB_INCLUDE_DIR}                                                                              #
     ${Boost_INCLUDE_DIRS}                                                                           #
     ${CMAKE_BINARY_DIR}                                                                             #
+)                                                                                                   #
+                                                                                                    #
+# try to get rid of some TPC-DS unniceties                                                          #
+include_directories(                                                                                #
+    SYSTEM                                                                                          #
+    ${PROJECT_SOURCE_DIR}/hyrise/third_party/                                                       #
 )                                                                                                   #
                                                                                                     #
 add_definitions(-DBOOST_THREAD_VERSION=5)                                                           #
@@ -27,4 +36,5 @@ add_compile_options(-std=c++17 -pthread -Wall -Wextra -pedantic -Werror -Wno-unu
 
 
 ### Modify this line to add your own plugin
-add_plugin(NAME Driver SRCS driver.cpp driver.hpp plan_cache_csv_exporter.cpp plan_cache_csv_exporter.hpp DEPS hyriseConsole hyriseServer hyrisePlayground)
+add_plugin(NAME Driver SRCS driver.cpp driver.hpp plan_cache_csv_exporter.cpp plan_cache_csv_exporter.hpp DEPS hyriseBenchmarkLib hyrisePlayground)
+target_link_libraries_system(Driver nlohmann_json::nlohmann_json)
