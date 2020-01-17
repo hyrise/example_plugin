@@ -28,7 +28,6 @@ struct TableScanInformation {
 	size_t runtime_ns{};
 	std::string description{};
 
-	// TODO: use third party library?
 	std::vector<std::string> string_vector() const {
 		std::vector<std::string> result;
 
@@ -47,8 +46,9 @@ struct TableScanInformation {
 
 class PlanCacheCsvExporter {
  public:
-  PlanCacheCsvExporter();
-  void write_to_disk();
+  PlanCacheCsvExporter(const std::string export_folder_name);
+  void run();
+  void write_to_disk() const;
  private:
   StorageManager& _sm;
 
@@ -59,8 +59,11 @@ class PlanCacheCsvExporter {
   std::string _process_projection(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash);
   void _process_index_scan(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash);
   std::string _process_join(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash);
-  void _process_pqp(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash);
 
+  void _process_pqp(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash);
+  void _extract_physical_query_plan_cache_data() const;
+
+  std::string _export_folder_name;
   std::vector<TableScanInformation> _table_scans;
 };
 

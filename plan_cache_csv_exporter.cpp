@@ -17,7 +17,7 @@
 
 namespace opossum {
 
-PlanCacheCsvExporter::PlanCacheCsvExporter() : _sm{Hyrise::get().storage_manager} {
+PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name) : _sm{Hyrise::get().storage_manager}, _export_folder_name{export_folder_name} {
   std::ofstream table_scans_csv;
   std::ofstream joins_csv;
   std::ofstream validates_csv;
@@ -41,24 +41,25 @@ PlanCacheCsvExporter::PlanCacheCsvExporter() : _sm{Hyrise::get().storage_manager
   validates_csv.close();
   aggregates_csv.close();
   projections_csv.close();
+}
 
-
+void PlanCacheCsvExporter::run() {
   for (const auto& [query_string, physical_query_plan] : *SQLPipelineBuilder::default_pqp_cache) {
     std::stringstream query_hex_hash;
     query_hex_hash << std::hex << std::hash<std::string>{}(query_string);
 
     _process_pqp(physical_query_plan, query_hex_hash.str());
-    // physical_query_plan->print(std::cout);
   }
 
+  _extract_physical_query_plan_cache_data();
   write_to_disk();
 }
 
-void PlanCacheCsvExporter::write_to_disk() {
+void PlanCacheCsvExporter::write_to_disk() const {
   const auto separator = "|";
 
   std::ofstream table_scans_csv;
-  table_scans_csv.open("table_scans2.csv");
+  table_scans_csv.open(_export_folder_name + "/table_scans.csv");
   table_scans_csv << "QUERY_HASH|SCAN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION\n";
   for (const auto& table_scan : _table_scans) {
     const auto string_vector = table_scan.string_vector();
@@ -71,6 +72,27 @@ void PlanCacheCsvExporter::write_to_disk() {
     table_scans_csv << "\n";
   }
   table_scans_csv.close();
+}
+
+void PlanCacheCsvExporter::_extract_physical_query_plan_cache_data() const {
+  std::ofstream plan_cache_csv_file(_export_folder_name + "/plan_cache.csv");
+  plan_cache_csv_file << "QUERY_HASH,EXECUTION_COUNT,QUERY_STRING\n";
+
+  for (const auto& [query_string, physical_query_plan] : *SQLPipelineBuilder::default_pqp_cache) {
+    auto& gdfs_cache = dynamic_cast<GDFSCache<std::string, std::shared_ptr<AbstractOperator>>&>(SQLPipelineBuilder::default_pqp_cache->cache());
+    const size_t frequency = gdfs_cache.frequency(query_string);
+
+    std::stringstream query_hex_hash;
+    query_hex_hash << std::hex << std::hash<std::string>{}(query_string);
+
+    auto query_single_line(query_string);
+    query_single_line.erase(std::remove(query_single_line.begin(), query_single_line.end(), '\n'),
+                            query_single_line.end());
+
+    plan_cache_csv_file << "\"" << query_hex_hash.str() << "\"" << "," << frequency << ",\"" << query_single_line << "\"\n";
+  }
+
+  plan_cache_csv_file.close();
 }
 
 std::string PlanCacheCsvExporter::_process_join(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash) {
