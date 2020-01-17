@@ -169,10 +169,11 @@ void Driver::start() {
   //
 
   const std::string folder_name = std::string(BENCHMARK) + "__SF_" + std::to_string(SCALE_FACTOR) + "__RUNS_" + std::to_string(config->max_runs);
-  std::cout << folder_name << std::endl;
   std::filesystem::create_directories(folder_name);
 
+  std::cout << "Exporting table/column/segments meta data ... ";
   extract_table_meta_data(folder_name);
+  std::cout << "done." << std::endl;
 
 
   if (SQLPipelineBuilder::default_pqp_cache->size() > 0) {
