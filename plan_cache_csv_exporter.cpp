@@ -44,7 +44,9 @@ PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name)
 }
 
 void PlanCacheCsvExporter::run() {
-  for (const auto& [query_string, physical_query_plan] : *SQLPipelineBuilder::default_pqp_cache) {
+  // for (const auto& [query_string, physical_query_plan] : *SQLPipelineBuilder::default_pqp_cache) {
+  for (auto iter = SQLPipelineBuilder::default_pqp_cache->unsafe_begin(); iter != SQLPipelineBuilder::default_pqp_cache->unsafe_end(); ++iter) {
+    const auto& [query_string, physical_query_plan] = *iter;
     std::stringstream query_hex_hash;
     query_hex_hash << std::hex << std::hash<std::string>{}(query_string);
 
@@ -78,8 +80,9 @@ void PlanCacheCsvExporter::_extract_physical_query_plan_cache_data() const {
   std::ofstream plan_cache_csv_file(_export_folder_name + "/plan_cache.csv");
   plan_cache_csv_file << "QUERY_HASH,EXECUTION_COUNT,QUERY_STRING\n";
 
-  for (const auto& [query_string, physical_query_plan] : *SQLPipelineBuilder::default_pqp_cache) {
-    auto& gdfs_cache = dynamic_cast<GDFSCache<std::string, std::shared_ptr<AbstractOperator>>&>(SQLPipelineBuilder::default_pqp_cache->cache());
+  for (auto iter = SQLPipelineBuilder::default_pqp_cache->unsafe_begin(); iter != SQLPipelineBuilder::default_pqp_cache->unsafe_end(); ++iter) {
+    const auto& [query_string, physical_query_plan] = *iter;
+    auto& gdfs_cache = dynamic_cast<GDFSCache<std::string, std::shared_ptr<AbstractOperator>>&>(SQLPipelineBuilder::default_pqp_cache->unsafe_cache());
     const size_t frequency = gdfs_cache.frequency(query_string);
 
     std::stringstream query_hex_hash;
