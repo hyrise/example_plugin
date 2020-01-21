@@ -29,8 +29,11 @@ include_directories(                                                            
 add_definitions(-DBOOST_THREAD_VERSION=5)                                                           #
                                                                                                     #
 # Global flags and include directories                                                              #
-add_compile_options(-std=c++17 -pthread -Wall -Wextra -pedantic -Werror -Wno-unused-parameter       #
+add_compile_options(-pthread -Wall -Wextra -pedantic -Werror -Wno-unused-parameter                  #
 -Wno-dollar-in-identifier-extension -Wno-unknown-pragmas)                                           #
+
+set(CMAKE_CXX_STANDARD_REQUIRED ON)                                                                 #
+set(CMAKE_CXX_STANDARD 20)                                                                          #
                                                                                                     #
 #####################################################################################################
 
