@@ -103,6 +103,8 @@ void Driver::start() {
   config->enable_visualization = false;
   config->chunk_size = 100'000;
   config->cache_binary_tables = true;
+  config->max_duration = std::chrono::seconds(300);
+  config->warmup_duration = std::chrono::seconds(20);
 
   constexpr auto USE_PREPARED_STATEMENTS = false;
   auto SCALE_FACTOR = 17.0f;  // later overwritten
@@ -112,8 +114,8 @@ void Driver::start() {
   //  TPC-H
   //
   if (BENCHMARK == "TPC-H") {
-    SCALE_FACTOR = 1.0f;
-    config->max_runs = 100;
+    SCALE_FACTOR = 10.0f;
+    config->max_runs = 10;
     // const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
     // auto item_runner = std::make_ unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
     auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
