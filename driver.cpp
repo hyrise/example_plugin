@@ -114,8 +114,9 @@ void Driver::start() {
   //  TPC-H
   //
   if (BENCHMARK == "TPC-H") {
-    SCALE_FACTOR = 10.0f;
+    SCALE_FACTOR = 0.1f;
     config->max_runs = 10;
+    config->warmup_duration = std::chrono::seconds(0);
     // const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
     // auto item_runner = std::make_ unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
     auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
@@ -173,15 +174,12 @@ void Driver::start() {
   const std::string folder_name = std::string(BENCHMARK) + "__SF_" + std::to_string(SCALE_FACTOR) + "__RUNS_" + std::to_string(config->max_runs);
   std::filesystem::create_directories(folder_name);
 
-  std::cout << "Exporting table/column/segments meta data ... ";
+  std::cout << "Exporting table/column/segments meta data." << std::endl;
   extract_table_meta_data(folder_name);
-  std::cout << "done." << std::endl;
 
-
-  if (SQLPipelineBuilder::default_pqp_cache->size() > 0) {
-    std::cout << "Exporting plan cache ... ";
+  if (Hyrise::get().default_pqp_cache->size() > 0) {
+    std::cout << "Exporting plan cache data." << std::endl;
     PlanCacheCsvExporter(folder_name).run();
-    std::cout << "done." << std::endl;
   } else {
     std::cerr << "Plan cache is empty." << std::endl;
     exit(17);

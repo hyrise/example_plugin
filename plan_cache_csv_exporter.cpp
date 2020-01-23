@@ -17,26 +17,22 @@
 
 namespace opossum {
 
-PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name) : _sm{Hyrise::get().storage_manager}, _export_folder_name{export_folder_name} {
-  std::ofstream table_scans_csv;
+PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name) : _sm{Hyrise::get().storage_manager}, _export_folder_name{export_folder_name}, _table_scans{}, _projections{} {
   std::ofstream joins_csv;
   std::ofstream validates_csv;
   std::ofstream aggregates_csv;
   std::ofstream projections_csv;
 
-  table_scans_csv.open("table_scans.csv");
-  joins_csv.open("joins.csv");
-  validates_csv.open("validates.csv");
-  aggregates_csv.open("aggregates.csv");
-  projections_csv.open("projections.csv");
+  joins_csv.open(_export_folder_name + "/joins.csv");
+  validates_csv.open(_export_folder_name + "/validates.csv");
+  aggregates_csv.open(_export_folder_name + "/aggregates.csv");
+  projections_csv.open(_export_folder_name + "/projections.csv");
 
-  table_scans_csv << "QUERY_HASH,SCAN_TYPE,TABLE_NAME,COLUMN_NAME,INPUT_ROWS,OUTPUT_ROWS,RUNTIME_NS,DESCRIPTION\n";
   joins_csv << "QUERY_HASH,JOIN_MODE,LEFT_TABLE_NAME,LEFT_COLUMN_NAME,LEFT_TABLE_ROW_COUNT,RIGHT_TABLE_NAME,RIGHT_COLUMN_NAME,RIGHT_TABLE_ROW_COUNT,OUTPUT_ROWS,PREDICATE_COUNT,PRIMARY_PREDICATE,RUNTIME_NS\n";
   validates_csv << "QUERY_HASH,INPUT_ROWS,OUTPUT_ROWS,RUNTIME_NS\n";
   aggregates_csv << "QUERY_HASH,AGGREGATE_HASH,COLUMN_TYPE,TABLE_NAME,COLUMN_NAME,GROUP_BY_COLUMN_COUNT,AGGREGATE_COLUMN_COUNT,INPUT_ROWS,OUTPUT_ROWS,RUNTIME_NS,DESCRIPTION\n";
   projections_csv << "QUERY_HASH,PROJECTION_HASH,COLUMN_TYPE,TABLE_NAME,COLUMN_NAME,INPUT_ROWS,OUTPUT_ROWS,RUNTIME_NS,DESCRIPTION\n";
 
-  table_scans_csv.close();
   joins_csv.close();
   validates_csv.close();
   aggregates_csv.close();
@@ -44,16 +40,27 @@ PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name)
 }
 
 void PlanCacheCsvExporter::run() {
+  std::ofstream plan_cache_csv_file(_export_folder_name + "/plan_cache.csv");
+  plan_cache_csv_file << "QUERY_HASH,EXECUTION_COUNT,QUERY_STRING\n";
+
   // for (const auto& [query_string, physical_query_plan] : *SQLPipelineBuilder::default_pqp_cache) {
-  for (auto iter = SQLPipelineBuilder::default_pqp_cache->unsafe_begin(); iter != SQLPipelineBuilder::default_pqp_cache->unsafe_end(); ++iter) {
+  for (auto iter = Hyrise::get().default_pqp_cache->unsafe_begin(); iter != Hyrise::get().default_pqp_cache->unsafe_end(); ++iter) {
     const auto& [query_string, physical_query_plan] = *iter;
     std::stringstream query_hex_hash;
     query_hex_hash << std::hex << std::hash<std::string>{}(query_string);
 
     _process_pqp(physical_query_plan, query_hex_hash.str());
+
+    // Plan cache CSV
+    auto& gdfs_cache = dynamic_cast<GDFSCache<std::string, std::shared_ptr<AbstractOperator>>&>(Hyrise::get().default_pqp_cache->unsafe_cache());
+    const size_t frequency = gdfs_cache.frequency(query_string);
+
+    auto query_single_line{query_string};
+    query_single_line.erase(std::remove(query_single_line.begin(), query_single_line.end(), '\n'),
+                            query_single_line.end());
+    plan_cache_csv_file << "\"" << query_hex_hash.str() << "\"" << "," << frequency << ",\"" << query_single_line << "\"\n";
   }
 
-  _extract_physical_query_plan_cache_data();
   write_to_disk();
 }
 
@@ -62,8 +69,8 @@ void PlanCacheCsvExporter::write_to_disk() const {
 
   std::ofstream table_scans_csv;
   table_scans_csv.open(_export_folder_name + "/table_scans.csv");
-  table_scans_csv << "QUERY_HASH|SCAN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION\n";
-  for (const auto& table_scan : _table_scans) {
+  table_scans_csv << _table_scans.csv_header << "\n";
+  for (const auto& table_scan : _table_scans.scans) {
     const auto string_vector = table_scan.string_vector();
     for (auto index = size_t{0}; index < string_vector.size(); ++index) {
       table_scans_csv << string_vector[index];
@@ -76,29 +83,7 @@ void PlanCacheCsvExporter::write_to_disk() const {
   table_scans_csv.close();
 }
 
-void PlanCacheCsvExporter::_extract_physical_query_plan_cache_data() const {
-  std::ofstream plan_cache_csv_file(_export_folder_name + "/plan_cache.csv");
-  plan_cache_csv_file << "QUERY_HASH,EXECUTION_COUNT,QUERY_STRING\n";
-
-  for (auto iter = SQLPipelineBuilder::default_pqp_cache->unsafe_begin(); iter != SQLPipelineBuilder::default_pqp_cache->unsafe_end(); ++iter) {
-    const auto& [query_string, physical_query_plan] = *iter;
-    auto& gdfs_cache = dynamic_cast<GDFSCache<std::string, std::shared_ptr<AbstractOperator>>&>(SQLPipelineBuilder::default_pqp_cache->unsafe_cache());
-    const size_t frequency = gdfs_cache.frequency(query_string);
-
-    std::stringstream query_hex_hash;
-    query_hex_hash << std::hex << std::hash<std::string>{}(query_string);
-
-    auto query_single_line(query_string);
-    query_single_line.erase(std::remove(query_single_line.begin(), query_single_line.end(), '\n'),
-                            query_single_line.end());
-
-    plan_cache_csv_file << "\"" << query_hex_hash.str() << "\"" << "," << frequency << ",\"" << query_single_line << "\"\n";
-  }
-
-  plan_cache_csv_file.close();
-}
-
-std::string PlanCacheCsvExporter::_process_join(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash) {
+std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
   const auto node = op->lqp_node;
   const auto join_node = std::dynamic_pointer_cast<const JoinNode>(node);
 
@@ -181,7 +166,7 @@ std::string PlanCacheCsvExporter::_process_join(std::shared_ptr<const AbstractOp
 }
 
 
-void PlanCacheCsvExporter::_process_index_scan(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash) {
+void PlanCacheCsvExporter::_process_index_scan(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
   const auto node = op->lqp_node;
   const auto predicate_node = std::dynamic_pointer_cast<const PredicateNode>(node);
   const auto operator_predicates = OperatorScanPredicate::from_expression(*predicate_node->predicate(), *node);
@@ -211,55 +196,8 @@ void PlanCacheCsvExporter::_process_index_scan(std::shared_ptr<const AbstractOpe
   }
 }
 
-std::string PlanCacheCsvExporter::_process_table_scan(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash) {
-  std::stringstream ss;
-
-  const auto node = op->lqp_node;
-  const auto predicate_node = std::dynamic_pointer_cast<const PredicateNode>(node);
-
-  const auto predicate = predicate_node->predicate();
-  // We iterate through the expression until we find the desired column being scanned.This works acceptably ok for most
-  // scans we are interested in (e.g., visits both columns of a column vs column scan).
-  visit_expression(predicate, [&](const auto& expression) {
-    if (expression->type == ExpressionType::LQPColumn) {
-      const auto column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(expression);
-      const auto column_reference = column_expression->column_reference;
-      const auto original_node = column_reference.original_node();
-
-      // Check if scan on data or reference table (this should ignore scans of temporary columns)
-      if (original_node->type == LQPNodeType::StoredTable) {
-        ss << query_hex_hash << ",";
-        if (original_node == node->left_input()) {
-          ss << "COLUMN_SCAN,";
-        } else {
-          ss << "REFERENCE_SCAN,";
-        }
-
-        const auto stored_table_node = std::dynamic_pointer_cast<const StoredTableNode>(original_node);
-        const auto& table_name = stored_table_node->table_name;
-        ss << table_name << ",";
-
-        const auto original_column_id = column_reference.original_column_id();
-        const auto& perf_data = op->performance_data;
-        auto description = op->description();
-        description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
-        description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
-
-        const auto sm_table = _sm.get_table(table_name);
-        ss << sm_table->column_names()[original_column_id] << "," << *(perf_data->input_row_count_left) << ",";
-        ss << *perf_data->output_row_count << ",";
-        ss << perf_data->walltime.count() << ",\"";
-        ss << description << "\"\n";
-      }
-    }
-    return ExpressionVisitation::VisitArguments;
-  });
-
-  return ss.str();
-}
-
-void PlanCacheCsvExporter::_process_table_scan2(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash) {
-  std::vector<TableScanInformation> result;
+void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
+  std::vector<SingleTableScan> table_scans;
 
   const auto node = op->lqp_node;
   const auto predicate_node = std::dynamic_pointer_cast<const PredicateNode>(node);
@@ -268,7 +206,7 @@ void PlanCacheCsvExporter::_process_table_scan2(std::shared_ptr<const AbstractOp
   // We iterate through the expression until we find the desired column being scanned. This works acceptably ok
   // for most scans we are interested in (e.g., visits both columns of a column vs column scan).
   visit_expression(predicate, [&](const auto& expression) {
-    std::string scan_mode{};
+    std::string column_type{};
     if (expression->type == ExpressionType::LQPColumn) {
       const auto column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(expression);
       const auto column_reference = column_expression->column_reference;
@@ -278,9 +216,9 @@ void PlanCacheCsvExporter::_process_table_scan2(std::shared_ptr<const AbstractOp
       if (original_node->type == LQPNodeType::StoredTable) {
         
         if (original_node == node->left_input()) {
-          scan_mode = "COLUMN_SCAN";
+          column_type = "DATA";
         } else {
-          scan_mode = "REFERENCE_SCAN";
+          column_type = "REFERENCE";
         }
 
         const auto stored_table_node = std::dynamic_pointer_cast<const StoredTableNode>(original_node);
@@ -295,7 +233,7 @@ void PlanCacheCsvExporter::_process_table_scan2(std::shared_ptr<const AbstractOp
         description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
         description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
 
-        result.emplace_back(TableScanInformation{query_hex_hash, scan_mode, table_name, sm_table->column_names()[original_column_id],
+        table_scans.emplace_back(SingleTableScan{query_hex_hash, column_type, table_name, sm_table->column_names()[original_column_id],
                              *perf_data->input_row_count_left, *perf_data->output_row_count, static_cast<size_t>(perf_data->walltime.count()),
                              description});
       }
@@ -303,10 +241,10 @@ void PlanCacheCsvExporter::_process_table_scan2(std::shared_ptr<const AbstractOp
     return ExpressionVisitation::VisitArguments;
   });
 
-  _table_scans.insert(_table_scans.end(), result.begin(), result.end());
+  _table_scans.scans.insert(_table_scans.scans.end(), table_scans.begin(), table_scans.end());
 }
 
-std::string PlanCacheCsvExporter::_process_validate(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash) {
+std::string PlanCacheCsvExporter::_process_validate(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
   const auto& perf_data = op->performance_data;
 
   std::stringstream ss;
@@ -315,7 +253,7 @@ std::string PlanCacheCsvExporter::_process_validate(std::shared_ptr<const Abstra
   return ss.str();
 }
 
-std::string PlanCacheCsvExporter::_process_aggregate(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash) {
+std::string PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
   const auto node = op->lqp_node;
   const auto aggregate_node = std::dynamic_pointer_cast<const AggregateNode>(node);
 
@@ -336,9 +274,9 @@ std::string PlanCacheCsvExporter::_process_aggregate(std::shared_ptr<const Abstr
         if (original_node->type == LQPNodeType::StoredTable) {
           ss << query_hex_hash << "," << agg_hex_hash.str() << ",";
           if (original_node == node->left_input()) {
-            ss << "COLUMN_AGGREGATE,";
+            ss << "DATA,";
           } else {
-            ss << "REFERENCE_AGGREGATE,";
+            ss << "REFERENCE,";
           }
 
           const auto stored_table_node = std::dynamic_pointer_cast<const StoredTableNode>(original_node);
@@ -372,11 +310,12 @@ std::string PlanCacheCsvExporter::_process_aggregate(std::shared_ptr<const Abstr
   return ss.str();
 }
 
-std::string PlanCacheCsvExporter::_process_projection(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash) {
+void PlanCacheCsvExporter::_process_projection(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
+  std::vector<SingleProjection> projections;
+
   const auto node = op->lqp_node;
   const auto projection_node = std::dynamic_pointer_cast<const ProjectionNode>(node);
 
-  std::string output;
   std::ostringstream op_description_ostream;
   op_description_ostream << *op;
   std::stringstream proj_hex_hash;
@@ -384,10 +323,7 @@ std::string PlanCacheCsvExporter::_process_projection(std::shared_ptr<const Abst
   const auto proj_hex_hash_str = proj_hex_hash.str();
 
   for (const auto& el : projection_node->node_expressions) {
-    std::vector<std::string> stringstreams(projection_node->node_expressions.size()*100);
-    auto write_id = std::atomic<size_t>(0);
     visit_expression(el, [&](const auto& expression) {
-      const auto visit_write_id = ++write_id;
       if (expression->type == ExpressionType::LQPColumn) {
         const auto column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(expression);
         const auto column_reference = column_expression->column_reference;
@@ -397,28 +333,19 @@ std::string PlanCacheCsvExporter::_process_projection(std::shared_ptr<const Abst
           const auto stored_table_node = std::dynamic_pointer_cast<const StoredTableNode>(original_node);
           const auto& table_name = stored_table_node->table_name;
           const auto original_column_id = column_reference.original_column_id();
+          const std::string column_type = (original_node == node->left_input()) ? "DATA" : "REFERENCE";
           const auto& perf_data = op->performance_data;
+          const auto sm_table = _sm.get_table(table_name);
+          const auto column_name = sm_table->column_names()[original_column_id];
           auto description = op->lqp_node->description();
           description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
           description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
-          const auto sm_table = _sm.get_table(table_name);
-          const auto column_name = sm_table->column_names()[original_column_id];
-          const auto output_rows = *perf_data->output_row_count;
-          const auto walltime = perf_data->walltime.count();
 
-          stringstreams[visit_write_id] += query_hex_hash + "," + proj_hex_hash_str;
-          if (original_node == node->left_input()) {
-            stringstreams[visit_write_id] += ",COLUMN_PROJECTION,";
-          } else {
-            stringstreams[visit_write_id] += ",REFERENCE_PROJECTION,";
-          }
-          stringstreams[visit_write_id] += table_name + ",";
-          stringstreams[visit_write_id] += column_name + "," + std::to_string(*(perf_data->input_row_count_left)) + ",";
-          stringstreams[visit_write_id] += std::to_string(output_rows) + ",";
-          stringstreams[visit_write_id] += std::to_string(walltime) + ",\"";
-          stringstreams[visit_write_id] += description + "\"";
+          projections.emplace_back(Projection{query_hex_hash, proj_hex_hash_str, column_type, table_name, column_name, *perf_data->input_row_count_left,
+            *perf_data->output_row_count, static_cast<size_t>(perf_data->walltime.count()), description});
         }
       }
+      // TODO: does that help???
       // else {
       //   if (expression->type == ExpressionType::Function) {
       //     std::cout << "Function " << expression->as_column_name() << " - " << expression->arguments.size() << std::endl;
@@ -443,37 +370,28 @@ std::string PlanCacheCsvExporter::_process_projection(std::shared_ptr<const Abst
       // }
       return ExpressionVisitation::VisitArguments;
     });
-    
-    for (const auto& stringstream : stringstreams) {
-      if (stringstream.size() > 0) {
-        output += stringstream + "\n";
-      }
-    }
   }
 
-  return output;
+  _projections.projections.insert(_projections.projections.end(), projections.begin(), projections.end());
 }
 
 
-void PlanCacheCsvExporter::_process_pqp(std::shared_ptr<const AbstractOperator> op, const std::string query_hex_hash) {
-  std::ofstream table_scans_csv;
+void PlanCacheCsvExporter::_process_pqp(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
   std::ofstream joins_csv;
   std::ofstream validates_csv;
   std::ofstream aggregates_csv;
   std::ofstream projections_csv;
 
-  table_scans_csv.open("table_scans.csv", std::ios_base::app);
-  joins_csv.open("joins.csv", std::ios_base::app);
-  validates_csv.open("validates.csv", std::ios_base::app);
-  aggregates_csv.open("aggregates.csv", std::ios_base::app);
-  projections_csv.open("projections.csv", std::ios_base::app);
+  joins_csv.open(_export_folder_name + "/joins.csv", std::ios_base::app);
+  validates_csv.open(_export_folder_name + "/validates.csv", std::ios_base::app);
+  aggregates_csv.open(_export_folder_name + "/aggregates.csv", std::ios_base::app);
+  projections_csv.open(_export_folder_name + "/projections.csv", std::ios_base::app);
 
   // TODO(anyone): handle diamonds?
   // Todo: handle index scans
   // TODO frequency should be used here not in the methods themselves
   if (op->type() == OperatorType::TableScan) {
-    table_scans_csv << _process_table_scan(op, query_hex_hash);
-    _process_table_scan2(op, query_hex_hash);
+    _process_table_scan(op, query_hex_hash);
   } else if (op->type() == OperatorType::JoinHash || op->type() == OperatorType::JoinNestedLoop || op->type() == OperatorType::JoinSortMerge) {
     joins_csv << _process_join(op, query_hex_hash);
   } else if (op->type() == OperatorType::IndexScan) {
