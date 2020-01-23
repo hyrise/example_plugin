@@ -2,7 +2,7 @@
 set(CMAKE_UNITY_BUILD "OFF")
 
 # Usually, you should not have to touch the following part ##########################################
-cmake_minimum_required(VERSION 3.13 FATAL_ERROR)                                                    #
+cmake_minimum_required(VERSION 3.16 FATAL_ERROR)                                                    #
                                                                                                     #
 project("Hyrise Example Plugin")                                                                    #
                                                                                                     #
