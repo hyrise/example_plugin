@@ -47,7 +47,7 @@ struct SingleTableScan {
 
 struct WorkloadTableScans {
   std::string csv_header{"QUERY_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION"};
-  std::vector<SingleTableScan> scans;
+  std::vector<SingleTableScan> instances;
 };
 
 struct SingleProjection {
@@ -65,7 +65,8 @@ struct SingleProjection {
     std::vector<std::string> result;
 
     result.emplace_back(wrap_string(query_hash));
-    result.emplace_back(wrap_string(scan_type));
+    result.emplace_back(wrap_string(projection_hash));
+    result.emplace_back(wrap_string(column_type));
     result.emplace_back(wrap_string(table_name));
     result.emplace_back(wrap_string(column_name));
     result.emplace_back(std::to_string(input_rows));
@@ -79,7 +80,7 @@ struct SingleProjection {
 
 struct WorkloadProjections {
   std::string csv_header{"QUERY_HASH|PROJECTION_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION"};
-  std::vector<SingleProjection> scans;
+  std::vector<SingleProjection> instances;
 };
 
 class PlanCacheCsvExporter {

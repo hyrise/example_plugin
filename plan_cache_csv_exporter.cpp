@@ -65,22 +65,27 @@ void PlanCacheCsvExporter::run() {
 }
 
 void PlanCacheCsvExporter::write_to_disk() const {
-  const auto separator = "|";
+  auto write_lines = [](const auto file_name, const auto operator_information) {
+    const auto separator = "|";
 
-  std::ofstream table_scans_csv;
-  table_scans_csv.open(_export_folder_name + "/table_scans.csv");
-  table_scans_csv << _table_scans.csv_header << "\n";
-  for (const auto& table_scan : _table_scans.scans) {
-    const auto string_vector = table_scan.string_vector();
-    for (auto index = size_t{0}; index < string_vector.size(); ++index) {
-      table_scans_csv << string_vector[index];
-      if (index < (string_vector.size() - 1)) {
-        table_scans_csv << separator;
+    std::ofstream output_csv;
+    output_csv.open(file_name);
+    output_csv << operator_information.csv_header << "\n";
+    for (const auto& instance : operator_information.instances) {
+      const auto string_vector = instance.string_vector();
+      for (auto index = size_t{0}; index < string_vector.size(); ++index) {
+        output_csv << string_vector[index];
+        if (index < (string_vector.size() - 1)) {
+          output_csv << separator;
+        }
       }
+      output_csv << "\n";
     }
-    table_scans_csv << "\n";
-  }
-  table_scans_csv.close();
+    output_csv.close();
+  };
+
+  write_lines(_export_folder_name + "/table_scans.csv", _table_scans);
+  write_lines(_export_folder_name + "/projections.csv", _projections);
 }
 
 std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
@@ -241,7 +246,7 @@ void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const Abstr
     return ExpressionVisitation::VisitArguments;
   });
 
-  _table_scans.scans.insert(_table_scans.scans.end(), table_scans.begin(), table_scans.end());
+  _table_scans.instances.insert(_table_scans.instances.end(), table_scans.begin(), table_scans.end());
 }
 
 std::string PlanCacheCsvExporter::_process_validate(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
@@ -341,7 +346,7 @@ void PlanCacheCsvExporter::_process_projection(const std::shared_ptr<const Abstr
           description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
           description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
 
-          projections.emplace_back(Projection{query_hex_hash, proj_hex_hash_str, column_type, table_name, column_name, *perf_data->input_row_count_left,
+          projections.emplace_back(SingleProjection{query_hex_hash, proj_hex_hash_str, column_type, table_name, column_name, *perf_data->input_row_count_left,
             *perf_data->output_row_count, static_cast<size_t>(perf_data->walltime.count()), description});
         }
       }
@@ -372,7 +377,7 @@ void PlanCacheCsvExporter::_process_projection(const std::shared_ptr<const Abstr
     });
   }
 
-  _projections.projections.insert(_projections.projections.end(), projections.begin(), projections.end());
+  _projections.instances.insert(_projections.instances.end(), projections.begin(), projections.end());
 }
 
 
@@ -401,7 +406,7 @@ void PlanCacheCsvExporter::_process_pqp(const std::shared_ptr<const AbstractOper
   } else if (op->type() == OperatorType::Aggregate) {
     aggregates_csv << _process_aggregate(op, query_hex_hash);
   } else if (op->type() == OperatorType::Projection) {
-    projections_csv << _process_projection(op, query_hex_hash);
+    _process_projection(op, query_hex_hash);
   } else {
   }
 
