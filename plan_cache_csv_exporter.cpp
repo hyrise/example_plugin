@@ -21,22 +21,18 @@ PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name)
   std::ofstream joins_csv;
   std::ofstream validates_csv;
   std::ofstream aggregates_csv;
-  std::ofstream projections_csv;
 
   joins_csv.open(_export_folder_name + "/joins.csv");
   validates_csv.open(_export_folder_name + "/validates.csv");
   aggregates_csv.open(_export_folder_name + "/aggregates.csv");
-  projections_csv.open(_export_folder_name + "/projections.csv");
 
   joins_csv << "QUERY_HASH,JOIN_MODE,LEFT_TABLE_NAME,LEFT_COLUMN_NAME,LEFT_TABLE_ROW_COUNT,RIGHT_TABLE_NAME,RIGHT_COLUMN_NAME,RIGHT_TABLE_ROW_COUNT,OUTPUT_ROWS,PREDICATE_COUNT,PRIMARY_PREDICATE,RUNTIME_NS\n";
   validates_csv << "QUERY_HASH,INPUT_ROWS,OUTPUT_ROWS,RUNTIME_NS\n";
   aggregates_csv << "QUERY_HASH,AGGREGATE_HASH,COLUMN_TYPE,TABLE_NAME,COLUMN_NAME,GROUP_BY_COLUMN_COUNT,AGGREGATE_COLUMN_COUNT,INPUT_ROWS,OUTPUT_ROWS,RUNTIME_NS,DESCRIPTION\n";
-  projections_csv << "QUERY_HASH,PROJECTION_HASH,COLUMN_TYPE,TABLE_NAME,COLUMN_NAME,INPUT_ROWS,OUTPUT_ROWS,RUNTIME_NS,DESCRIPTION\n";
 
   joins_csv.close();
   validates_csv.close();
   aggregates_csv.close();
-  projections_csv.close();
 }
 
 void PlanCacheCsvExporter::run() {
@@ -341,7 +337,12 @@ void PlanCacheCsvExporter::_process_projection(const std::shared_ptr<const Abstr
           const std::string column_type = (original_node == node->left_input()) ? "DATA" : "REFERENCE";
           const auto& perf_data = op->performance_data;
           const auto sm_table = _sm.get_table(table_name);
-          const auto column_name = sm_table->column_names()[original_column_id];
+          std::string column_name = "";
+          if (original_column_id != INVALID_COLUMN_ID) {
+            column_name = sm_table->column_names()[original_column_id];
+          } else {
+            column_name = "COUNT(*)";
+          }
           auto description = op->lqp_node->description();
           description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
           description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
@@ -385,12 +386,10 @@ void PlanCacheCsvExporter::_process_pqp(const std::shared_ptr<const AbstractOper
   std::ofstream joins_csv;
   std::ofstream validates_csv;
   std::ofstream aggregates_csv;
-  std::ofstream projections_csv;
 
   joins_csv.open(_export_folder_name + "/joins.csv", std::ios_base::app);
   validates_csv.open(_export_folder_name + "/validates.csv", std::ios_base::app);
   aggregates_csv.open(_export_folder_name + "/aggregates.csv", std::ios_base::app);
-  projections_csv.open(_export_folder_name + "/projections.csv", std::ios_base::app);
 
   // TODO(anyone): handle diamonds?
   // Todo: handle index scans
