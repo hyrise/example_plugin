@@ -138,6 +138,9 @@ void Driver::start() {
     config->max_runs = 1;
     config->warmup_duration = std::chrono::seconds(0);
     const std::string query_path = "hyrise/resources/benchmark/tpcds/tpcds-result-reproduction/query_qualification";
+    if (!std::filesystem::exists("resources/")) {
+      std::cout << "When resources for TPC-DS cannot be found on Linux, create a symlink as a workaround: 'ln -s hyrise/resources resources'." << std::endl;
+    }
 
     auto query_generator = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, filename_blacklist());
     auto table_generator = std::make_unique<TpcdsTableGenerator>(SCALE_FACTOR, config);
