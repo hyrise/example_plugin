@@ -227,6 +227,12 @@ void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const Abstr
 
         const auto original_column_id = column_reference.original_column_id();
         const auto sm_table = _sm.get_table(table_name);
+        std::string column_name = "";
+        if (original_column_id != INVALID_COLUMN_ID) {
+          column_name = sm_table->column_names()[original_column_id];
+        } else {
+          column_name = "COUNT(*)";
+        }
 
         const auto& perf_data = op->performance_data;
 
@@ -234,7 +240,7 @@ void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const Abstr
         description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
         description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
 
-        table_scans.emplace_back(SingleTableScan{query_hex_hash, column_type, table_name, sm_table->column_names()[original_column_id],
+        table_scans.emplace_back(SingleTableScan{query_hex_hash, column_type, table_name, column_name,
                              *perf_data->input_row_count_left, *perf_data->output_row_count, static_cast<size_t>(perf_data->walltime.count()),
                              description});
       }
