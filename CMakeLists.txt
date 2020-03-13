@@ -40,4 +40,3 @@ set(CMAKE_CXX_STANDARD 20)                                                      
 
 ### Modify this line to add your own plugin
 add_plugin(NAME Driver SRCS driver.cpp driver.hpp plan_cache_csv_exporter.cpp plan_cache_csv_exporter.hpp DEPS hyriseBenchmarkLib hyrisePlayground)
-target_link_libraries_system(Driver nlohmann_json::nlohmann_json)
