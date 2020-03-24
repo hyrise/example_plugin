@@ -98,7 +98,8 @@ class PlanCacheCsvExporter {
   void _process_index_scan(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
   std::string _process_join(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
 
-  void _process_pqp(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
+  void _process_pqp(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash,
+                    std::unordered_set<std::shared_ptr<const AbstractOperator>>& visited_pqp_nodes);
   void _extract_physical_query_plan_cache_data() const;
 
   std::string _export_folder_name;

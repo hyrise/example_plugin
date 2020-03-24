@@ -45,7 +45,8 @@ void PlanCacheCsvExporter::run() {
     std::stringstream query_hex_hash;
     query_hex_hash << std::hex << std::hash<std::string>{}(query_string);
 
-    _process_pqp(physical_query_plan, query_hex_hash.str());
+    std::unordered_set<std::shared_ptr<const AbstractOperator>> visited_pqp_nodes;
+    _process_pqp(physical_query_plan, query_hex_hash.str(), visited_pqp_nodes);
 
     // Plan cache CSV
     auto& gdfs_cache = dynamic_cast<GDFSCache<std::string, std::shared_ptr<AbstractOperator>>&>(Hyrise::get().default_pqp_cache->unsafe_cache());
@@ -388,7 +389,8 @@ void PlanCacheCsvExporter::_process_projection(const std::shared_ptr<const Abstr
 }
 
 
-void PlanCacheCsvExporter::_process_pqp(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
+void PlanCacheCsvExporter::_process_pqp(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash,
+                                        std::unordered_set<std::shared_ptr<const AbstractOperator>>& visited_pqp_nodes) {
   std::ofstream joins_csv;
   std::ofstream validates_csv;
   std::ofstream aggregates_csv;
@@ -399,7 +401,6 @@ void PlanCacheCsvExporter::_process_pqp(const std::shared_ptr<const AbstractOper
 
   // TODO(anyone): handle diamonds?
   // Todo: handle index scans
-  // TODO frequency should be used here not in the methods themselves
   if (op->type() == OperatorType::TableScan) {
     _process_table_scan(op, query_hex_hash);
   } else if (op->type() == OperatorType::JoinHash || op->type() == OperatorType::JoinNestedLoop || op->type() == OperatorType::JoinSortMerge) {
@@ -415,8 +416,18 @@ void PlanCacheCsvExporter::_process_pqp(const std::shared_ptr<const AbstractOper
   } else {
   }
 
-  if (op->input_left()) _process_pqp(op->input_left(), query_hex_hash);
-  if (op->input_right()) _process_pqp(op->input_right(), query_hex_hash);
+  visited_pqp_nodes.insert(op);
+
+  const auto left_input = op->input_left();
+  const auto right_input = op->input_right();
+  if (left_input && !visited_pqp_nodes.contains(left_input)) {
+    _process_pqp(left_input, query_hex_hash, visited_pqp_nodes);
+    visited_pqp_nodes.insert(std::move(left_input));
+  }
+  if (right_input && !visited_pqp_nodes.contains(right_input)) {
+    _process_pqp(right_input, query_hex_hash, visited_pqp_nodes);
+    visited_pqp_nodes.insert(std::move(right_input));
+  }
 }
 
 }  // namespace opossum
