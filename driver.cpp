@@ -41,7 +41,7 @@ const std::unordered_set<std::string> filename_blacklist() {
 
 void extract_table_meta_data(const std::string folder_name) {
   auto table_to_csv = [](const std::string table_name, const std::string csv_file_name) {
-    const auto table = SQLPipelineBuilder{"SELECT * FROM " + MetaTableManager::META_PREFIX + table_name}
+    const auto table = SQLPipelineBuilder{"SELECT * FROM " + table_name}
                           .create_pipeline()
                           .get_result_table().second;
     std::ofstream output_file(csv_file_name);
@@ -117,9 +117,9 @@ void Driver::start() {
     SCALE_FACTOR = 0.1f;
     config->max_runs = 1;
     config->warmup_duration = std::chrono::seconds(0);
-    // const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
-    // auto item_runner = std::make_ unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{20}};
+    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
+    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
@@ -188,6 +188,8 @@ void Driver::start() {
     std::cerr << "Plan cache is empty." << std::endl;
     exit(17);
   }
+
+  std::cout << "Done." << std::endl;
 }
 
 void Driver::stop() {

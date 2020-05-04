@@ -26,7 +26,7 @@ PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name)
   validates_csv.open(_export_folder_name + "/validates.csv");
   aggregates_csv.open(_export_folder_name + "/aggregates.csv");
 
-  joins_csv << "QUERY_HASH,JOIN_MODE,LEFT_TABLE_NAME,LEFT_COLUMN_NAME,LEFT_TABLE_ROW_COUNT,RIGHT_TABLE_NAME,RIGHT_COLUMN_NAME,RIGHT_TABLE_ROW_COUNT,OUTPUT_ROWS,PREDICATE_COUNT,PRIMARY_PREDICATE,RUNTIME_NS\n";
+  joins_csv << "QUERY_HASH,JOIN_MODE,LEFT_TABLE_NAME,LEFT_COLUMN_NAME,LEFT_TABLE_ROW_COUNT,RIGHT_TABLE_NAME,RIGHT_COLUMN_NAME,RIGHT_TABLE_ROW_COUNT,OUTPUT_ROWS,PREDICATE_COUNT,PRIMARY_PREDICATE,RUNTIME_NS,DESCRIPTION\n";
   validates_csv << "QUERY_HASH,INPUT_ROWS,OUTPUT_ROWS,RUNTIME_NS\n";
   aggregates_csv << "QUERY_HASH,AGGREGATE_HASH,COLUMN_TYPE,TABLE_NAME,COLUMN_NAME,GROUP_BY_COLUMN_COUNT,AGGREGATE_COLUMN_COUNT,INPUT_ROWS,OUTPUT_ROWS,RUNTIME_NS,DESCRIPTION\n";
 
@@ -108,6 +108,7 @@ std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const Abst
           original_column_id_0 = column_reference.original_column_id();
 
           const auto original_node_0 = column_reference.original_node();
+          std::cout << "left: " << *original_node_0 << std::endl;
           if (original_node_0->type == LQPNodeType::StoredTable) {
             const auto stored_table_node_0 = std::dynamic_pointer_cast<const StoredTableNode>(original_node_0);
             table_name_0 = stored_table_node_0->table_name;
@@ -124,6 +125,7 @@ std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const Abst
           original_column_id_1 = column_reference.original_column_id();
           
           const auto original_node_1 = column_reference.original_node();
+          std::cout << "right: " << *original_node_1 << std::endl;
           if (original_node_1->type == LQPNodeType::StoredTable) {
             const auto stored_table_node_1 = std::dynamic_pointer_cast<const StoredTableNode>(original_node_1);
             table_name_1 = stored_table_node_1->table_name;
@@ -145,13 +147,19 @@ std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const Abst
         column_name_1 = sm_table_1->column_names()[original_column_id_1];
       }
 
-      // auto table_id = _table_name_id_map.left.at(table_name_0);
-      // auto identifier = std::make_pair(table_id, original_column_id_0);
-      ss << table_name_0 << "," << column_name_0 << "," << *(perf_data->input_row_count_left)  << ",";
-      ss << table_name_1 << "," << column_name_1 << "," << *(perf_data->input_row_count_right) << ",";
-      ss << *perf_data->output_row_count << ",";
+      auto description = op->description();
+      description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
+      description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
+
+      const auto& left_input_perf_data = op->input_left()->performance_data;
+      const auto& right_input_perf_data = op->input_right()->performance_data;
+
+      ss << table_name_0 << "," << column_name_0 << "," << left_input_perf_data->output_row_count  << ",";
+      ss << table_name_1 << "," << column_name_1 << "," << right_input_perf_data->output_row_count << ",";
+      ss << perf_data->output_row_count << ",";
       ss << join_node->node_expressions.size() << "," << predicate_condition_to_string.left.at((*operator_predicate).predicate_condition) << ",";
-      ss << perf_data->walltime.count() << "\n";
+      ss << perf_data->walltime.count() << "," << description << "\n";
+
       // update_map(join_map, identifier, perf_data);
 
       // How do we know whether the left_input_rows are actually added to the left table?
@@ -167,8 +175,8 @@ std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const Abst
   return ss.str();
 }
 
-
-void PlanCacheCsvExporter::_process_index_scan(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
+void PlanCacheCsvExporter::_process_index_scan(const std::shared_ptr<const AbstractOperator>& op,
+                                               const std::string& query_hex_hash) {
   const auto node = op->lqp_node;
   const auto predicate_node = std::dynamic_pointer_cast<const PredicateNode>(node);
   const auto operator_predicates = OperatorScanPredicate::from_expression(*predicate_node->predicate(), *node);
@@ -188,8 +196,8 @@ void PlanCacheCsvExporter::_process_index_scan(const std::shared_ptr<const Abstr
             const auto& table_name = stored_table_node->table_name;
             // const auto table_id = _table_name_id_map.left.at(table_name);
 
-            const auto& perf_data = op->performance_data;
-            std::cout << table_name << "," << *(perf_data->input_row_count_left) << std::endl;
+            const auto& left_input_perf_data = op->input_left()->performance_data;
+            std::cout << table_name << "," << left_input_perf_data->output_row_count << std::endl;
           }
         }
         return ExpressionVisitation::VisitArguments;
@@ -235,15 +243,16 @@ void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const Abstr
           column_name = "COUNT(*)";
         }
 
-        const auto& perf_data = op->performance_data;
-
         auto description = op->description();
         description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
         description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
 
+        const auto& perf_data = op->performance_data;
+        const auto& left_input_perf_data = op->input_left()->performance_data;
+
         table_scans.emplace_back(SingleTableScan{query_hex_hash, column_type, table_name, column_name,
-                             *perf_data->input_row_count_left, *perf_data->output_row_count, static_cast<size_t>(perf_data->walltime.count()),
-                             description});
+                             left_input_perf_data->output_row_count, perf_data->output_row_count,
+                             static_cast<size_t>(perf_data->walltime.count()), description});
       }
     }
     return ExpressionVisitation::VisitArguments;
@@ -254,9 +263,10 @@ void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const Abstr
 
 std::string PlanCacheCsvExporter::_process_validate(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
   const auto& perf_data = op->performance_data;
+  const auto& left_input_perf_data = op->input_left()->performance_data;
 
   std::stringstream ss;
-  ss << query_hex_hash << "," << *(perf_data->input_row_count_left) << "," << *perf_data->output_row_count << "," << perf_data->walltime.count() << "\n";
+  ss << query_hex_hash << "," << left_input_perf_data->output_row_count << "," << perf_data->output_row_count << "," << perf_data->walltime.count() << "\n";
 
   return ss.str();
 }
@@ -293,6 +303,7 @@ std::string PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const
 
           const auto original_column_id = column_reference.original_column_id();
           const auto& perf_data = op->performance_data;
+          const auto& left_input_perf_data = op->input_left()->performance_data;
 
           const auto node_expression_count = aggregate_node->node_expressions.size();
           const auto group_by_column_count = aggregate_node->aggregate_expressions_begin_idx;
@@ -305,8 +316,8 @@ std::string PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const
           } else {
             column_name = "COUNT(*)";
           }
-          ss << column_name << "," << *(perf_data->input_row_count_left) << ",";
-          ss << *perf_data->output_row_count << ",";
+          ss << column_name << "," << left_input_perf_data->output_row_count << ",";
+          ss << perf_data->output_row_count << ",";
           ss << perf_data->walltime.count() << ",\"";
           ss << op->description() << "\"\n";
         }
@@ -343,6 +354,7 @@ void PlanCacheCsvExporter::_process_projection(const std::shared_ptr<const Abstr
           const auto original_column_id = column_reference.original_column_id();
           const std::string column_type = (original_node == node->left_input()) ? "DATA" : "REFERENCE";
           const auto& perf_data = op->performance_data;
+          const auto& left_input_perf_data = op->input_left()->performance_data;
           const auto sm_table = _sm.get_table(table_name);
           std::string column_name = "";
           if (original_column_id != INVALID_COLUMN_ID) {
@@ -354,8 +366,9 @@ void PlanCacheCsvExporter::_process_projection(const std::shared_ptr<const Abstr
           description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
           description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
 
-          projections.emplace_back(SingleProjection{query_hex_hash, proj_hex_hash_str, column_type, table_name, column_name, *perf_data->input_row_count_left,
-            *perf_data->output_row_count, static_cast<size_t>(perf_data->walltime.count()), description});
+          projections.emplace_back(SingleProjection{query_hex_hash, proj_hex_hash_str, column_type, table_name,
+            column_name, left_input_perf_data->output_row_count, perf_data->output_row_count,
+            static_cast<size_t>(perf_data->walltime.count()), description});
         }
       }
       // TODO: does that help???
