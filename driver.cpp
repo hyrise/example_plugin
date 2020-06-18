@@ -1,6 +1,8 @@
 #include <fstream>
 #include <unordered_set>
 
+#include <boost/algorithm/string.hpp>
+
 #include "driver.hpp"
 #include "plan_cache_csv_exporter.hpp"
 
@@ -40,6 +42,7 @@ const std::unordered_set<std::string> filename_blacklist() {
 }
 
 void extract_table_meta_data(const std::string folder_name) {
+  // TODO: why not use the CSV exporter?
   auto table_to_csv = [](const std::string table_name, const std::string csv_file_name) {
     const auto table = SQLPipelineBuilder{"SELECT * FROM " + table_name}
                           .create_pipeline()
@@ -48,7 +51,9 @@ void extract_table_meta_data(const std::string folder_name) {
 
     const auto column_names = table->column_names();
     for (auto column_id = size_t{0}; column_id < column_names.size(); ++column_id) {
-      output_file << column_names[column_id];
+      auto column_name = column_names[column_id];
+      boost::to_upper(column_name);
+      output_file << column_name;
       if (column_id < (column_names.size() - 1)) {
         output_file << "|";
       }
@@ -110,16 +115,21 @@ void Driver::start() {
   auto SCALE_FACTOR = 17.0f;  // later overwritten
 
 
+  // Set caches
+  Hyrise::get().default_pqp_cache = std::make_shared<SQLPhysicalPlanCache>(100'000);
+  Hyrise::get().default_lqp_cache = std::make_shared<SQLLogicalPlanCache>(100'000);
+
+
   //
   //  TPC-H
   //
   if (BENCHMARK == "TPC-H") {
     SCALE_FACTOR = 0.1f;
-    config->max_runs = 1;
+    config->max_runs = 10;
     config->warmup_duration = std::chrono::seconds(0);
-    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{20}};
-    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    // const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
+    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
+    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
