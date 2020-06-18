@@ -7,7 +7,7 @@ namespace opossum {
 
 class Driver : public AbstractPlugin, public Singleton<Driver> {
  public:
-  const std::string description() const final;
+  std::string description() const final;
 
   void start() final;
 

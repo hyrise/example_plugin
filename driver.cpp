@@ -79,7 +79,7 @@ void extract_table_meta_data(const std::string folder_name) {
 
 }  // namespace
 
-const std::string Driver::description() const { return "This driver executes benchmarks and outputs its plan cache to an array of CSV files."; }
+std::string Driver::description() const { return "This driver executes benchmarks and outputs its plan cache to an array of CSV files."; }
 
 void Driver::start() {
   const auto BENCHMARKS = std::vector<std::string>{"TPC-H", "TPC-DS", "JOB"}; 

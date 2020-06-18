@@ -20,7 +20,9 @@ namespace opossum {
 
 struct SingleTableScan {
   std::string query_hash{};
-  // TODO: scan hash for column vs column 
+  std::string left_input_operator{};
+  std::string right_input_operator{};
+  std::string scan_hash{};
   std::string scan_type{};
   std::string table_name{};
   std::string column_name{};
@@ -33,6 +35,9 @@ struct SingleTableScan {
     std::vector<std::string> result;
 
     result.emplace_back(wrap_string(query_hash));
+    result.emplace_back(wrap_string(left_input_operator));
+    result.emplace_back(wrap_string(right_input_operator));
+    result.emplace_back(wrap_string(scan_hash));
     result.emplace_back(wrap_string(scan_type));
     result.emplace_back(wrap_string(table_name));
     result.emplace_back(wrap_string(column_name));
@@ -46,12 +51,14 @@ struct SingleTableScan {
 };
 
 struct WorkloadTableScans {
-  std::string csv_header{"QUERY_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION"};
+  std::string csv_header{"QUERY_HASH|LEFT_INPUT_OPERATOR|RIGHT_INPUT_OPERATOR|SCAN_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION"};
   std::vector<SingleTableScan> instances;
 };
 
 struct SingleProjection {
   std::string query_hash{};
+  std::string left_input_operator{};
+  std::string right_input_operator{};
   std::string projection_hash{};
   std::string column_type{};
   std::string table_name{};
@@ -65,6 +72,8 @@ struct SingleProjection {
     std::vector<std::string> result;
 
     result.emplace_back(wrap_string(query_hash));
+    result.emplace_back(wrap_string(left_input_operator));
+    result.emplace_back(wrap_string(right_input_operator));
     result.emplace_back(wrap_string(projection_hash));
     result.emplace_back(wrap_string(column_type));
     result.emplace_back(wrap_string(table_name));
@@ -79,7 +88,7 @@ struct SingleProjection {
 };
 
 struct WorkloadProjections {
-  std::string csv_header{"QUERY_HASH|PROJECTION_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION"};
+  std::string csv_header{"QUERY_HASH|LEFT_INPUT_OPERATOR|RIGHT_INPUT_OPERATOR|PROJECTION_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION"};
   std::vector<SingleProjection> instances;
 };
 
