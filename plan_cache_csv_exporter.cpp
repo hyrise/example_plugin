@@ -22,7 +22,7 @@ namespace {
 
 using namespace opossum;  // NOLINT
 
-std::string camel_to_csv_row_title(const auto& title) {
+std::string camel_to_csv_row_title(const std::string& title) {
   auto result = std::string{};
   auto string_index = size_t{0};
   for (unsigned char character : title) {
@@ -64,13 +64,15 @@ PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name)
 
   joins_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|JOIN_MODE|LEFT_TABLE_NAME|LEFT_COLUMN_NAME|LEFT_TABLE_ROW_COUNT|RIGHT_TABLE_NAME|RIGHT_COLUMN_NAME|RIGHT_TABLE_ROW_COUNT|OUTPUT_ROWS|PREDICATE_COUNT|PRIMARY_PREDICATE|IS_FLIPPED|RADIX_BITS|";
   for (const auto step_name : magic_enum::enum_names<JoinHash::OperatorSteps>()) {
-    joins_csv << camel_to_csv_row_title(step_name) << "_NS|";
+    const auto step_name_str = std::string{step_name};
+    joins_csv << camel_to_csv_row_title(step_name_str) << "_NS|";
   }
   joins_csv << "RUNTIME_NS|DESCRIPTION\n";
   validates_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS\n";
   aggregates_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|GROUP_BY_COLUMN_COUNT|AGGREGATE_COLUMN_COUNT|INPUT_ROWS|OUTPUT_ROWS|";
   for (const auto step_name : magic_enum::enum_names<AggregateHash::OperatorSteps>()) {
-    aggregates_csv << camel_to_csv_row_title(step_name) << "_NS|";
+    const auto step_name_str = std::string{step_name};
+    aggregates_csv << camel_to_csv_row_title(step_name_str) << "_NS|";
   }
   aggregates_csv << "RUNTIME_NS|DESCRIPTION\n";
 
