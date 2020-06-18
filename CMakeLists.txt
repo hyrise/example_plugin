@@ -22,6 +22,7 @@ include_directories(                                                            
     ${PROJECT_SOURCE_DIR}/hyrise/src/lib/                                                           #
     ${PROJECT_SOURCE_DIR}/hyrise/src/benchmarklib/                                                  #
     ${PROJECT_SOURCE_DIR}/hyrise/third_party/flat_hash_map                                          #
+    ${PROJECT_SOURCE_DIR}/hyrise/third_party/nlohmann_json/single_include                           #
     ${PROJECT_SOURCE_DIR}/hyrise/third_party/magic_enum/include                                     #
     ${PROJECT_SOURCE_DIR}/hyrise/third_party/sql-parser/src                                         #
     ${PROJECT_SOURCE_DIR}/hyrise/third_party/cxxopts/include                                        #
