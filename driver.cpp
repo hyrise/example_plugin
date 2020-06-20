@@ -156,7 +156,7 @@ void Driver::start() {
   config->cache_binary_tables = true;
   config->max_duration = std::chrono::seconds(300);
   config->warmup_duration = std::chrono::seconds(0);
-  // config->cache_binary_tables = false; // might be necessary due to some problems with binary exports :(
+  config->cache_binary_tables = false; // might be necessary due to some problems with binary exports :(
 
   constexpr auto USE_PREPARED_STATEMENTS = false;
   auto SCALE_FACTOR = 17.0f;  // later overwritten
@@ -230,7 +230,8 @@ void Driver::start() {
   //  /JOB
   //
 
-  const std::string folder_name = std::string(BENCHMARK) + "__SF_" + std::to_string(SCALE_FACTOR) + "__RUNS_" + std::to_string(config->max_runs);
+  std::string folder_name = std::string(BENCHMARK) + "__SF_" + std::to_string(SCALE_FACTOR);
+  folder_name += "__RUNS_" + std::to_string(config->max_runs) + "__ENCODING_" + main_encoding;
   std::filesystem::create_directories(folder_name);
 
   std::cout << "Exporting table/column/segments meta data." << std::endl;
