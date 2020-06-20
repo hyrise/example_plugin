@@ -88,28 +88,75 @@ std::string Driver::description() const { return "This driver executes benchmark
 
 void Driver::start() {
   const auto BENCHMARKS = std::vector<std::string>{"TPC-H", "TPC-DS", "JOB"}; 
+  const auto ENCODINGS = std::vector<std::string>{"DictionaryFSBA", "DictionarySIMDBP128", "Uncompressed",
+                                                  "LZ4", "RunLength", "FixedStringAndFrameOfReferenceFSBA",
+                                                  "FixedStringAndFrameOfReferenceSIMDBP128"}; 
+  auto main_encoding = ENCODINGS[0];
 
-  const auto env_var = std::getenv("BENCHMARK_TO_RUN");
-  if (env_var == NULL) {
+  const auto env_var_benchmark = std::getenv("BENCHMARK_TO_RUN");
+  if (env_var_benchmark == NULL) {
     std::cerr << "Please pass environment variable \"BENCHMARK_TO_RUN\" to set a target benchmark.\nExiting Plugin." << std::flush;
     exit(17);
+  }
+
+  const auto env_var_encoding = std::getenv("ENCODING_TO_USE");
+  if (env_var_encoding == NULL) {
+    std::cout << "Encoding data with the default of " << main_encoding << std::endl;
+  } else {
+    main_encoding = std::string{env_var_encoding};
+    std::cout << "Encoding data with " << main_encoding << std::endl;
   } 
 
-  auto BENCHMARK = std::string(env_var);
+  auto BENCHMARK = std::string(env_var_benchmark);
   if (std::find(BENCHMARKS.begin(), BENCHMARKS.end(), BENCHMARK) == BENCHMARKS.end()) {
     std::cerr << "Benchmark \"" << BENCHMARK << "\" not supported. Supported benchmarks: ";
     for (const auto& benchmark : BENCHMARKS) std::cout << "\"" << benchmark << "\" ";
     std::cerr << "\nExiting." << std::flush;
     exit(17);
   }
+  if (std::find(ENCODINGS.begin(), ENCODINGS.end(), main_encoding) == ENCODINGS.end()) {
+    std::cerr << "Encoding \"" << main_encoding << "\" not supported. Supported encodings: ";
+    for (const auto& encoding : ENCODINGS) std::cout << "\"" << encoding << "\" ";
+    std::cerr << "\nExiting." << std::flush;
+    exit(17);
+  }
   std::cout << "Running " << BENCHMARK << " ... " << std::endl;
 
+  auto encoding_config = EncodingConfig{};
+  if (main_encoding == "DictionaryFSBA") {
+    encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::Dictionary, VectorCompressionType::FixedSizeByteAligned});
+  } else if (main_encoding == "DictionaryFSBA") {
+    encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::Dictionary, VectorCompressionType::SimdBp128});
+  } else if (main_encoding == "LZ4") {
+    encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::LZ4});
+  } else if (main_encoding == "RunLength") {
+    encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::RunLength});
+  } else if (main_encoding == "FixedStringAndFrameOfReferenceFSBA") {
+    // Passing a default of dictionary encoding, use FoR for integers and FString for strings.
+    std::unordered_map<DataType, SegmentEncodingSpec> mapping = {
+        {DataType::Int, SegmentEncodingSpec{EncodingType::FrameOfReference, VectorCompressionType::FixedSizeByteAligned}},
+        {DataType::String, SegmentEncodingSpec{EncodingType::FixedStringDictionary}}
+      };
+    encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::Dictionary, VectorCompressionType::FixedSizeByteAligned},
+      mapping, std::unordered_map<std::string, std::unordered_map<std::string, SegmentEncodingSpec>>{});
+  } else if (main_encoding == "FixedStringAndFrameOfReferenceSIMDBP128") {
+    // Passing a default of dictionary encoding, use FoR for integers and FString for strings.
+    std::unordered_map<DataType, SegmentEncodingSpec> mapping = {
+        {DataType::Int, SegmentEncodingSpec{EncodingType::FrameOfReference, VectorCompressionType::SimdBp128}},
+        {DataType::String, SegmentEncodingSpec{EncodingType::FixedStringDictionary}}
+      };
+    encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::Dictionary, VectorCompressionType::FixedSizeByteAligned},
+      mapping, std::unordered_map<std::string, std::unordered_map<std::string, SegmentEncodingSpec>>{});
+  }
+
   auto config = std::make_shared<BenchmarkConfig>(BenchmarkConfig::get_default_config());
+  config->encoding_config = encoding_config;
   config->max_runs = 10;
   config->enable_visualization = false;
   config->cache_binary_tables = true;
   config->max_duration = std::chrono::seconds(300);
-  config->warmup_duration = std::chrono::seconds(20);
+  config->warmup_duration = std::chrono::seconds(0);
+  // config->cache_binary_tables = false; // might be necessary due to some problems with binary exports :(
 
   constexpr auto USE_PREPARED_STATEMENTS = false;
   auto SCALE_FACTOR = 17.0f;  // later overwritten
@@ -125,8 +172,7 @@ void Driver::start() {
   //
   if (BENCHMARK == "TPC-H") {
     SCALE_FACTOR = 0.1f;
-    config->max_runs = 10;
-    config->warmup_duration = std::chrono::seconds(0);
+    config->max_runs = 1;
     // const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
     // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
     auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
@@ -146,7 +192,6 @@ void Driver::start() {
   else if (BENCHMARK == "TPC-DS") {
     SCALE_FACTOR = 1.0f;
     config->max_runs = 1;
-    config->warmup_duration = std::chrono::seconds(0);
     const std::string query_path = "hyrise/resources/benchmark/tpcds/tpcds-result-reproduction/query_qualification";
     if (!std::filesystem::exists("resources/")) {
       std::cout << "When resources for TPC-DS cannot be found on Linux, create a symlink as a workaround: 'ln -s hyrise/resources resources'." << std::endl;

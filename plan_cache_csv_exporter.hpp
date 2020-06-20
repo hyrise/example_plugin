@@ -26,7 +26,8 @@ struct SingleGetTable {
   std::string table_name{};
   size_t pruned_chunk_count{};
   size_t pruned_column_count{};
-  size_t output_rows{};
+  size_t output_chunk_count{};
+  size_t output_row_count{};
   size_t runtime_ns{};
   std::string description{};
 
@@ -40,7 +41,8 @@ struct SingleGetTable {
     result.emplace_back(wrap_string(table_name));
     result.emplace_back(std::to_string(pruned_chunk_count));
     result.emplace_back(std::to_string(pruned_column_count));
-    result.emplace_back(std::to_string(output_rows));
+    result.emplace_back(std::to_string(output_chunk_count));
+    result.emplace_back(std::to_string(output_row_count));
     result.emplace_back(std::to_string(runtime_ns));
     result.emplace_back(wrap_string(description));
 
@@ -49,7 +51,7 @@ struct SingleGetTable {
 };
 
 struct WorkloadGetTables {
-  std::string csv_header{"QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|TABLE_NAME|PRUNED_CHUNK_COUNT|PRUNED_COLUMN_COUNT|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION"};
+  std::string csv_header{"QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|TABLE_NAME|PRUNED_CHUNK_COUNT|PRUNED_COLUMN_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
   std::vector<SingleGetTable> instances;
 };
 
@@ -61,8 +63,12 @@ struct SingleTableScan {
   std::string scan_type{};
   std::string table_name{};
   std::string column_name{};
-  size_t input_rows{};
-  size_t output_rows{};
+  size_t scans_skipped{};
+  size_t scans_sorted{};
+  size_t input_chunk_count{};
+  size_t input_row_count{};
+  size_t output_chunk_count{};
+  size_t output_row_count{};
   size_t runtime_ns{};
   std::string description{};
 
@@ -76,8 +82,12 @@ struct SingleTableScan {
     result.emplace_back(wrap_string(scan_type));
     result.emplace_back(wrap_string(table_name));
     result.emplace_back(wrap_string(column_name));
-    result.emplace_back(std::to_string(input_rows));
-    result.emplace_back(std::to_string(output_rows));
+    result.emplace_back(std::to_string(scans_skipped));
+    result.emplace_back(std::to_string(scans_sorted));
+    result.emplace_back(std::to_string(input_chunk_count));
+    result.emplace_back(std::to_string(input_row_count));
+    result.emplace_back(std::to_string(output_chunk_count));
+    result.emplace_back(std::to_string(output_row_count));
     result.emplace_back(std::to_string(runtime_ns));
     result.emplace_back(wrap_string(description));
 
@@ -86,7 +96,7 @@ struct SingleTableScan {
 };
 
 struct WorkloadTableScans {
-  std::string csv_header{"QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION"};
+  std::string csv_header{"QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|SCANS_SKIPPED|SCANS_SORTED|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
   std::vector<SingleTableScan> instances;
 };
 
@@ -98,8 +108,10 @@ struct SingleProjection {
   std::string column_type{};
   std::string table_name{};
   std::string column_name{};
-  size_t input_rows{};
-  size_t output_rows{};
+  size_t input_chunk_count{};
+  size_t input_row_count{};
+  size_t output_chunk_count{};
+  size_t output_row_count{};
   size_t runtime_ns{};
   std::string description{};
 
@@ -113,8 +125,10 @@ struct SingleProjection {
     result.emplace_back(wrap_string(column_type));
     result.emplace_back(wrap_string(table_name));
     result.emplace_back(wrap_string(column_name));
-    result.emplace_back(std::to_string(input_rows));
-    result.emplace_back(std::to_string(output_rows));
+    result.emplace_back(std::to_string(input_chunk_count));
+    result.emplace_back(std::to_string(input_row_count));
+    result.emplace_back(std::to_string(output_chunk_count));
+    result.emplace_back(std::to_string(output_row_count));
     result.emplace_back(std::to_string(runtime_ns));
     result.emplace_back(wrap_string(description));
 
@@ -123,7 +137,7 @@ struct SingleProjection {
 };
 
 struct WorkloadProjections {
-  std::string csv_header{"QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS|DESCRIPTION"};
+  std::string csv_header{"QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
   std::vector<SingleProjection> instances;
 };
 

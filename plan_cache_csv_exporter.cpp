@@ -14,6 +14,7 @@
 #include "operators/aggregate_hash.hpp"
 #include "operators/operator_join_predicate.hpp"
 #include "operators/operator_scan_predicate.hpp"
+#include "operators/table_scan.hpp"
 #include "sql/sql_pipeline_builder.hpp"
 #include "sql/sql_plan_cache.hpp"
 #include "storage/table.hpp"
@@ -62,14 +63,14 @@ PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name)
   validates_csv.open(_export_folder_name + "/validates.csv");
   aggregates_csv.open(_export_folder_name + "/aggregates.csv");
 
-  joins_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|JOIN_MODE|LEFT_TABLE_NAME|LEFT_COLUMN_NAME|LEFT_TABLE_ROW_COUNT|RIGHT_TABLE_NAME|RIGHT_COLUMN_NAME|RIGHT_TABLE_ROW_COUNT|OUTPUT_ROWS|PREDICATE_COUNT|PRIMARY_PREDICATE|IS_FLIPPED|RADIX_BITS|";
+  joins_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|JOIN_MODE|LEFT_TABLE_NAME|LEFT_COLUMN_NAME|LEFT_TABLE_CHUNK_COUNT|LEFT_TABLE_ROW_COUNT|RIGHT_TABLE_NAME|RIGHT_COLUMN_NAME|RIGHT_TABLE_CHUNK_COUNT|RIGHT_TABLE_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|PREDICATE_COUNT|PRIMARY_PREDICATE|IS_FLIPPED|RADIX_BITS|";
   for (const auto step_name : magic_enum::enum_names<JoinHash::OperatorSteps>()) {
     const auto step_name_str = std::string{step_name};
     joins_csv << camel_to_csv_row_title(step_name_str) << "_NS|";
   }
   joins_csv << "RUNTIME_NS|DESCRIPTION\n";
-  validates_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|INPUT_ROWS|OUTPUT_ROWS|RUNTIME_NS\n";
-  aggregates_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|GROUP_BY_COLUMN_COUNT|AGGREGATE_COLUMN_COUNT|INPUT_ROWS|OUTPUT_ROWS|";
+  validates_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS\n";
+  aggregates_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|GROUP_BY_COLUMN_COUNT|AGGREGATE_COLUMN_COUNT|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|";
   for (const auto step_name : magic_enum::enum_names<AggregateHash::OperatorSteps>()) {
     const auto step_name_str = std::string{step_name};
     aggregates_csv << camel_to_csv_row_title(step_name_str) << "_NS|";
@@ -192,21 +193,25 @@ std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const Abst
       // Check if the join predicate has been switched (hence, it differs between LQP and PQP) which is done when
       // table A and B are joined but the join predicate is "flipped" (e.g., b.x = a.x). The effect of flipping is that
       // the predicates are in the order (left/right) as the join input tables are.
-      if (operator_predicate->is_flipped()) {
-        ss << left_table_name << "|" << column_name_0 << "|" << left_input_perf_data->output_row_count  << "|";
-        ss << right_table_name << "|" << column_name_1 << "|" << right_input_perf_data->output_row_count << "|";
+      if (!operator_predicate->is_flipped()) {
+        ss << left_table_name << "|" << column_name_0 << "|" << left_input_perf_data->output_chunk_count
+           << "|" << left_input_perf_data->output_row_count << "|";
+        ss << right_table_name << "|" << column_name_1 << "|" << right_input_perf_data->output_chunk_count
+           << "|" << right_input_perf_data->output_row_count << "|";
       } else {
-        ss << right_table_name << "|" << column_name_1 << "|" << left_input_perf_data->output_row_count  << "|";
-        ss << left_table_name << "|" << column_name_0 << "|" << right_input_perf_data->output_row_count << "|";
+        ss << right_table_name << "|" << column_name_1 << "|" << left_input_perf_data->output_chunk_count
+           << "|" << left_input_perf_data->output_row_count << "|";
+        ss << left_table_name << "|" << column_name_0 << "|" << right_input_perf_data->output_chunk_count
+           << "|" << right_input_perf_data->output_row_count << "|";
       }
 
       const auto& perf_data = op->performance_data;
-      ss << perf_data->output_row_count << "|";
+      ss << perf_data->output_chunk_count << "|" << perf_data->output_row_count << "|";
       ss << join_node->node_expressions.size() << "|" << predicate_condition_to_string.left.at((*operator_predicate).predicate_condition) << "|";
       if (const auto join_hash_op = dynamic_pointer_cast<const JoinHash>(op)) {
         const auto& join_hash_perf_data = dynamic_cast<const JoinHash::PerformanceData&>(*join_hash_op->performance_data);
-        const auto flipped = join_hash_perf_data.right_input_is_build_side ? "TRUE" : "FALSE";
-        ss << flipped << "|" << join_hash_perf_data.radix_bits << "|";
+        const auto build_and_probe_side_flipped = join_hash_perf_data.right_input_is_build_side ? "TRUE" : "FALSE";
+        ss << build_and_probe_side_flipped << "|" << join_hash_perf_data.radix_bits << "|";
 
         for (const auto step_name : magic_enum::enum_values<JoinHash::OperatorSteps>()) {
           ss << join_hash_perf_data.get_step_runtime(step_name).count() << "|";
@@ -291,18 +296,22 @@ void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const Abstr
           column_name = "COUNT(*)";
         }
 
+        const auto table_scan_op = dynamic_pointer_cast<const TableScan>(op);
+        Assert(table_scan_op, "Unexpected non-table-scan operators");
+        const auto& operator_perf_data = dynamic_cast<const TableScan::PerformanceData&>(*table_scan_op->performance_data);
+
         auto description = op->description();
         description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
         description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
 
-        const auto& perf_data = op->performance_data;
         const auto& left_input_perf_data = op->left_input()->performance_data;
 
         table_scans.emplace_back(SingleTableScan{query_hex_hash, get_operator_hash(op),
                                                  get_operator_hash(op->left_input()), "NULL", column_type, table_name,
-                                                 column_name, left_input_perf_data->output_row_count,
-                                                 perf_data->output_row_count,
-                                                 static_cast<size_t>(perf_data->walltime.count()), description});
+                                                 column_name, operator_perf_data.chunk_scans_skipped, operator_perf_data.chunk_scans_sorted,
+                                                 left_input_perf_data->output_chunk_count, left_input_perf_data->output_row_count,
+                                                 operator_perf_data.output_chunk_count, operator_perf_data.output_row_count,
+                                                 static_cast<size_t>(operator_perf_data.walltime.count()), description});
       }
     }
     return ExpressionVisitation::VisitArguments;
@@ -325,7 +334,8 @@ void PlanCacheCsvExporter::_process_get_table(const std::shared_ptr<const Abstra
 
   get_tables.emplace_back(SingleGetTable{query_hex_hash, get_operator_hash(op), "NULL", "NULL",
                                           get_table_op->table_name(), get_table_op->pruned_chunk_ids().size(),
-                                          get_table_op->pruned_column_ids().size(), perf_data->output_row_count,
+                                          get_table_op->pruned_column_ids().size(), perf_data->output_chunk_count,
+                                          perf_data->output_row_count,
                                           static_cast<size_t>(perf_data->walltime.count()), description});
 
   _get_tables.instances.insert(_get_tables.instances.end(), get_tables.begin(), get_tables.end());
@@ -337,7 +347,10 @@ std::string PlanCacheCsvExporter::_process_validate(const std::shared_ptr<const 
 
   // TODO(Martin): Do we need the table name?
   std::stringstream ss;
-  ss << query_hex_hash << "|" << left_input_perf_data->output_row_count << "|" << perf_data->output_row_count << "|" << perf_data->walltime.count() << "\n";
+  ss << query_hex_hash << "|" << get_operator_hash(op) << "|" << get_operator_hash(op->left_input())
+     << "|NULL|" << left_input_perf_data->output_chunk_count << "|" << left_input_perf_data->output_chunk_count
+     << "|" << perf_data->output_chunk_count << "|" << perf_data->output_row_count << "|"
+     << perf_data->walltime.count() << "\n";
 
   return ss.str();
 }
@@ -347,11 +360,6 @@ std::string PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const
   const auto aggregate_node = std::dynamic_pointer_cast<const AggregateNode>(node);
 
   std::stringstream ss;
-  std::ostringstream op_description_ostream;
-  op_description_ostream << *op;
-  std::stringstream agg_hex_hash;
-  agg_hex_hash << std::hex << std::hash<std::string>{}(op_description_ostream.str());
-
   for (const auto& el : aggregate_node->node_expressions) {
     // TODO: ensure we do not traverse too deep here, isn't the loop sufficient?
     visit_expression(el, [&](const auto& expression) {
@@ -360,7 +368,8 @@ std::string PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const
         const auto original_node = column_expression->original_node.lock();
 
         if (original_node->type == LQPNodeType::StoredTable) {
-          ss << query_hex_hash << "|" << get_operator_hash(op->left_input()) << "|NULL|" << agg_hex_hash.str() << "|";
+          ss << query_hex_hash << "|" << get_operator_hash(op) << "|" << get_operator_hash(op->left_input())
+             << "|NULL|";
           if (original_node == node->left_input()) {
             ss << "DATA|";
           } else {
@@ -375,10 +384,6 @@ std::string PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const
           const auto& perf_data = op->performance_data;
           const auto& left_input_perf_data = op->left_input()->performance_data;
 
-          const auto node_expression_count = aggregate_node->node_expressions.size();
-          const auto group_by_column_count = aggregate_node->aggregate_expressions_begin_idx;
-          ss << group_by_column_count << "|" << (node_expression_count - group_by_column_count) << "|";
-
           const auto sm_table = _sm.get_table(table_name);
           std::string column_name = "";
           if (original_column_id != INVALID_COLUMN_ID) {
@@ -386,8 +391,14 @@ std::string PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const
           } else {
             column_name = "COUNT(*)";
           }
-          ss << column_name << "|" << left_input_perf_data->output_row_count << "|";
-          ss << perf_data->output_row_count << "|";
+
+          const auto node_expression_count = aggregate_node->node_expressions.size();
+          const auto group_by_column_count = aggregate_node->aggregate_expressions_begin_idx;
+          ss << group_by_column_count << "|" << (node_expression_count - group_by_column_count) << "|";
+
+          ss << column_name << "|" << left_input_perf_data->output_chunk_count << "|"
+             << left_input_perf_data->output_row_count << "|" << perf_data->output_chunk_count << "|"
+             << perf_data->output_row_count << "|";
           if (const auto aggregate_hash_op = dynamic_pointer_cast<const AggregateHash>(op)) {
             const auto& operator_perf_data = dynamic_cast<const OperatorPerformanceData<AggregateHash::OperatorSteps>&>(*aggregate_hash_op->performance_data);
             for (const auto step_name : magic_enum::enum_values<AggregateHash::OperatorSteps>()) {
@@ -441,7 +452,8 @@ void PlanCacheCsvExporter::_process_projection(const std::shared_ptr<const Abstr
 
           projections.emplace_back(SingleProjection{query_hex_hash, get_operator_hash(op),
             get_operator_hash(op->left_input()), "NULL", column_type, table_name,
-            column_name, left_input_perf_data->output_row_count, perf_data->output_row_count,
+            column_name, left_input_perf_data->output_chunk_count, left_input_perf_data->output_row_count,
+            perf_data->output_chunk_count, perf_data->output_row_count,
             static_cast<size_t>(perf_data->walltime.count()), description});
         }
       }
