@@ -56,21 +56,21 @@ namespace opossum {
 
 PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name) : _sm{Hyrise::get().storage_manager}, _export_folder_name{export_folder_name}, _table_scans{}, _projections{} {
   std::ofstream joins_csv;
-  std::ofstream validates_csv;
+  std::ofstream general_operators_csv;
   std::ofstream aggregates_csv;
 
   joins_csv.open(_export_folder_name + "/joins.csv");
-  validates_csv.open(_export_folder_name + "/validates.csv");
+  general_operators_csv.open(_export_folder_name + "/general_operators.csv");
   aggregates_csv.open(_export_folder_name + "/aggregates.csv");
 
-  joins_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|JOIN_MODE|LEFT_TABLE_NAME|LEFT_COLUMN_NAME|LEFT_TABLE_CHUNK_COUNT|LEFT_TABLE_ROW_COUNT|RIGHT_TABLE_NAME|RIGHT_COLUMN_NAME|RIGHT_TABLE_CHUNK_COUNT|RIGHT_TABLE_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|PREDICATE_COUNT|PRIMARY_PREDICATE|IS_FLIPPED|RADIX_BITS|";
+  joins_csv << "OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|JOIN_MODE|LEFT_TABLE_NAME|LEFT_COLUMN_NAME|LEFT_TABLE_CHUNK_COUNT|LEFT_TABLE_ROW_COUNT|RIGHT_TABLE_NAME|RIGHT_COLUMN_NAME|RIGHT_TABLE_CHUNK_COUNT|RIGHT_TABLE_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|PREDICATE_COUNT|PRIMARY_PREDICATE|IS_FLIPPED|RADIX_BITS|";
   for (const auto step_name : magic_enum::enum_names<JoinHash::OperatorSteps>()) {
     const auto step_name_str = std::string{step_name};
     joins_csv << camel_to_csv_row_title(step_name_str) << "_NS|";
   }
   joins_csv << "RUNTIME_NS|DESCRIPTION\n";
-  validates_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS\n";
-  aggregates_csv << "QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|GROUP_BY_COLUMN_COUNT|AGGREGATE_COLUMN_COUNT|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|";
+  general_operators_csv << "OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS\n";
+  aggregates_csv << "OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|GROUP_BY_COLUMN_COUNT|AGGREGATE_COLUMN_COUNT|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|";
   for (const auto step_name : magic_enum::enum_names<AggregateHash::OperatorSteps>()) {
     const auto step_name_str = std::string{step_name};
     aggregates_csv << camel_to_csv_row_title(step_name_str) << "_NS|";
@@ -78,7 +78,7 @@ PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name)
   aggregates_csv << "RUNTIME_NS|DESCRIPTION\n";
 
   joins_csv.close();
-  validates_csv.close();
+  general_operators_csv.close();
   aggregates_csv.close();
 }
 
@@ -140,7 +140,7 @@ std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const Abst
                                                                          *node->left_input(), *node->right_input());
 
   std::stringstream ss;
-  ss << query_hex_hash << "|" << get_operator_hash(op) << "|" << get_operator_hash(op->left_input()) << "|"
+  ss << "JOIN|" << query_hex_hash << "|" << get_operator_hash(op) << "|" << get_operator_hash(op->left_input()) << "|"
      << get_operator_hash(op->right_input()) << "|" << join_mode_to_string.left.at(join_node->join_mode) << "|";
   if (operator_predicate.has_value()) {
     const auto predicate_expression = std::dynamic_pointer_cast<const AbstractPredicateExpression>(join_node->node_expressions[0]);
@@ -231,35 +231,6 @@ std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const Abst
   return ss.str();
 }
 
-void PlanCacheCsvExporter::_process_index_scan(const std::shared_ptr<const AbstractOperator>& op,
-                                               const std::string& query_hex_hash) {
-  const auto node = op->lqp_node;
-  const auto predicate_node = std::dynamic_pointer_cast<const PredicateNode>(node);
-  const auto operator_predicates = OperatorScanPredicate::from_expression(*predicate_node->predicate(), *node);
-
-  // TODO(anyone): I never used an index scan, so I am not sure if I am handling it right.
-  std::cout << "Unhandled operation ..." << std::endl;
-  if (operator_predicates->size() < 2) {
-    for (const auto& el : node->node_expressions) {
-      visit_expression(el, [&](const auto& expression) {
-        if (expression->type == ExpressionType::LQPColumn) {
-          const auto column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(expression);
-          const auto original_node = column_expression->original_node.lock();
-
-          if (original_node->type == LQPNodeType::StoredTable) {
-            const auto stored_table_node = std::dynamic_pointer_cast<const StoredTableNode>(original_node);
-            const auto& table_name = stored_table_node->table_name;
-
-            const auto& left_input_perf_data = op->left_input()->performance_data;
-            std::cout << table_name << "|" << left_input_perf_data->output_row_count << std::endl;
-          }
-        }
-        return ExpressionVisitation::VisitArguments;
-      });
-    }
-  }
-}
-
 void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
   std::vector<SingleTableScan> table_scans;
 
@@ -341,13 +312,14 @@ void PlanCacheCsvExporter::_process_get_table(const std::shared_ptr<const Abstra
   _get_tables.instances.insert(_get_tables.instances.end(), get_tables.begin(), get_tables.end());
 }
 
-std::string PlanCacheCsvExporter::_process_validate(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
+std::string PlanCacheCsvExporter::_process_general_operator(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
   const auto& perf_data = op->performance_data;
   const auto& left_input_perf_data = op->left_input()->performance_data;
 
   // TODO(Martin): Do we need the table name?
+  const auto type_name = std::string{magic_enum::enum_name(op->type())};
   std::stringstream ss;
-  ss << query_hex_hash << "|" << get_operator_hash(op) << "|" << get_operator_hash(op->left_input())
+  ss << camel_to_csv_row_title(type_name) << "|" << query_hex_hash << "|" << get_operator_hash(op) << "|" << get_operator_hash(op->left_input())
      << "|NULL|" << left_input_perf_data->output_chunk_count << "|" << left_input_perf_data->output_chunk_count
      << "|" << perf_data->output_chunk_count << "|" << perf_data->output_row_count << "|"
      << perf_data->walltime.count() << "\n";
@@ -368,8 +340,8 @@ std::string PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const
         const auto original_node = column_expression->original_node.lock();
 
         if (original_node->type == LQPNodeType::StoredTable) {
-          ss << query_hex_hash << "|" << get_operator_hash(op) << "|" << get_operator_hash(op->left_input())
-             << "|NULL|";
+          ss << "AGGREGATE|" <<query_hex_hash << "|" << get_operator_hash(op) << "|"
+             << get_operator_hash(op->left_input()) << "|NULL|";
           if (original_node == node->left_input()) {
             ss << "DATA|";
           } else {
@@ -491,11 +463,11 @@ void PlanCacheCsvExporter::_process_projection(const std::shared_ptr<const Abstr
 void PlanCacheCsvExporter::_process_pqp(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash,
                                         std::unordered_set<std::shared_ptr<const AbstractOperator>>& visited_pqp_nodes) {
   std::ofstream joins_csv;
-  std::ofstream validates_csv;
+  std::ofstream general_operators_csv;
   std::ofstream aggregates_csv;
 
   joins_csv.open(_export_folder_name + "/joins.csv", std::ios_base::app);
-  validates_csv.open(_export_folder_name + "/validates.csv", std::ios_base::app);
+  general_operators_csv.open(_export_folder_name + "/general_operators.csv", std::ios_base::app);
   aggregates_csv.open(_export_folder_name + "/aggregates.csv", std::ios_base::app);
 
   // TODO(anyone): handle diamonds?
@@ -506,15 +478,14 @@ void PlanCacheCsvExporter::_process_pqp(const std::shared_ptr<const AbstractOper
     _process_get_table(op, query_hex_hash);
   } else if (op->type() == OperatorType::JoinHash || op->type() == OperatorType::JoinNestedLoop || op->type() == OperatorType::JoinSortMerge) {
     joins_csv << _process_join(op, query_hex_hash);
-  } else if (op->type() == OperatorType::IndexScan) {
-    _process_index_scan(op, query_hex_hash);
-  } else if (op->type() == OperatorType::Validate) {
-    validates_csv << _process_validate(op, query_hex_hash);
   } else if (op->type() == OperatorType::Aggregate) {
     aggregates_csv << _process_aggregate(op, query_hex_hash);
   } else if (op->type() == OperatorType::Projection) {
     _process_projection(op, query_hex_hash);
+  } else if (op->type() == OperatorType::CreateView || op->type() == OperatorType::DropView) {
+    // Both make problems when hashing their descriptions.
   } else {
+    general_operators_csv << _process_general_operator(op, query_hex_hash);
   }
 
   visited_pqp_nodes.insert(op);

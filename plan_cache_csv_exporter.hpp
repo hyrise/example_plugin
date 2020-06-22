@@ -34,6 +34,7 @@ struct SingleGetTable {
   std::vector<std::string> string_vector() const {
     std::vector<std::string> result;
 
+    result.emplace_back("GET_TABLE");
     result.emplace_back(wrap_string(query_hash));
     result.emplace_back(wrap_string(operator_hash));
     result.emplace_back(wrap_string(left_input_operator));
@@ -51,7 +52,7 @@ struct SingleGetTable {
 };
 
 struct WorkloadGetTables {
-  std::string csv_header{"QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|TABLE_NAME|PRUNED_CHUNK_COUNT|PRUNED_COLUMN_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
+  std::string csv_header{"OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|TABLE_NAME|PRUNED_CHUNK_COUNT|PRUNED_COLUMN_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
   std::vector<SingleGetTable> instances;
 };
 
@@ -75,6 +76,7 @@ struct SingleTableScan {
   std::vector<std::string> string_vector() const {
     std::vector<std::string> result;
 
+    result.emplace_back("TABLE_SCAN");
     result.emplace_back(wrap_string(query_hash));
     result.emplace_back(wrap_string(operator_hash));
     result.emplace_back(wrap_string(left_input_operator));
@@ -96,7 +98,7 @@ struct SingleTableScan {
 };
 
 struct WorkloadTableScans {
-  std::string csv_header{"QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|SCANS_SKIPPED|SCANS_SORTED|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
+  std::string csv_header{"OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|SCANS_SKIPPED|SCANS_SORTED|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
   std::vector<SingleTableScan> instances;
 };
 
@@ -118,6 +120,7 @@ struct SingleProjection {
   std::vector<std::string> string_vector() const {
     std::vector<std::string> result;
 
+    result.emplace_back("PROJECTION");
     result.emplace_back(wrap_string(query_hash));
     result.emplace_back(wrap_string(operator_hash));
     result.emplace_back(wrap_string(left_input_operator));
@@ -137,7 +140,7 @@ struct SingleProjection {
 };
 
 struct WorkloadProjections {
-  std::string csv_header{"QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
+  std::string csv_header{"OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
   std::vector<SingleProjection> instances;
 };
 
@@ -151,10 +154,9 @@ class PlanCacheCsvExporter {
 
   void _process_table_scan(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
   void _process_get_table(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
-  std::string _process_validate(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
+  std::string _process_general_operator(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
   std::string _process_aggregate(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
   void _process_projection(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
-  void _process_index_scan(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
   std::string _process_join(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
 
   void _process_pqp(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash,
