@@ -64,6 +64,7 @@ struct SingleTableScan {
   std::string scan_type{};
   std::string table_name{};
   std::string column_name{};
+  std::string predicate_condition{};
   size_t scans_skipped{};
   size_t scans_sorted{};
   size_t input_chunk_count{};
@@ -84,6 +85,7 @@ struct SingleTableScan {
     result.emplace_back(wrap_string(scan_type));
     result.emplace_back(wrap_string(table_name));
     result.emplace_back(wrap_string(column_name));
+    result.emplace_back(wrap_string(predicate_condition));
     result.emplace_back(std::to_string(scans_skipped));
     result.emplace_back(std::to_string(scans_sorted));
     result.emplace_back(std::to_string(input_chunk_count));
@@ -98,7 +100,7 @@ struct SingleTableScan {
 };
 
 struct WorkloadTableScans {
-  std::string csv_header{"OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|SCANS_SKIPPED|SCANS_SORTED|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
+  std::string csv_header{"OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|PREDICATE_CONDITION|SCANS_SKIPPED|SCANS_SORTED|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION"};
   std::vector<SingleTableScan> instances;
 };
 

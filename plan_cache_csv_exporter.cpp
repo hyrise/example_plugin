@@ -258,6 +258,13 @@ void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const Abstr
         const auto stored_table_node = std::dynamic_pointer_cast<const StoredTableNode>(original_node);
         const auto& table_name = stored_table_node->table_name;
 
+        auto scan_predicate_condition = std::string{"Unknown"};
+        const auto operator_scan_predicates = OperatorScanPredicate::from_expression(*predicate, *stored_table_node);
+        if (operator_scan_predicates->size() == 1) {
+          const auto condition = (*operator_scan_predicates)[0].predicate_condition;
+          scan_predicate_condition = magic_enum::enum_name(condition);
+        }
+
         const auto original_column_id = column_expression->original_column_id;
         const auto sm_table = _sm.get_table(table_name);
         std::string column_name = "";
@@ -279,10 +286,15 @@ void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const Abstr
 
         table_scans.emplace_back(SingleTableScan{query_hex_hash, get_operator_hash(op),
                                                  get_operator_hash(op->left_input()), "NULL", column_type, table_name,
-                                                 column_name, operator_perf_data.chunk_scans_skipped, operator_perf_data.chunk_scans_sorted,
-                                                 left_input_perf_data->output_chunk_count, left_input_perf_data->output_row_count,
-                                                 operator_perf_data.output_chunk_count, operator_perf_data.output_row_count,
-                                                 static_cast<size_t>(operator_perf_data.walltime.count()), description});
+                                                 column_name, scan_predicate_condition,
+                                                 operator_perf_data.chunk_scans_skipped,
+                                                 operator_perf_data.chunk_scans_sorted,
+                                                 left_input_perf_data->output_chunk_count,
+                                                 left_input_perf_data->output_row_count,
+                                                 operator_perf_data.output_chunk_count,
+                                                 operator_perf_data.output_row_count,
+                                                 static_cast<size_t>(operator_perf_data.walltime.count()),
+                                                 description});
       }
     }
     return ExpressionVisitation::VisitArguments;
