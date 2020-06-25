@@ -375,12 +375,13 @@ std::string PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const
           } else {
             column_name = "COUNT(*)";
           }
+          ss << column_name << "|";
 
           const auto node_expression_count = aggregate_node->node_expressions.size();
           const auto group_by_column_count = aggregate_node->aggregate_expressions_begin_idx;
           ss << group_by_column_count << "|" << (node_expression_count - group_by_column_count) << "|";
 
-          ss << column_name << "|" << left_input_perf_data->output_chunk_count << "|"
+          ss << left_input_perf_data->output_chunk_count << "|"
              << left_input_perf_data->output_row_count << "|" << perf_data->output_chunk_count << "|"
              << perf_data->output_row_count << "|";
           if (const auto aggregate_hash_op = dynamic_pointer_cast<const AggregateHash>(op)) {
