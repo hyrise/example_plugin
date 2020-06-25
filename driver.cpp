@@ -88,9 +88,9 @@ std::string Driver::description() const { return "This driver executes benchmark
 
 void Driver::start() {
   const auto BENCHMARKS = std::vector<std::string>{"TPC-H", "TPC-DS", "JOB"}; 
-  const auto ENCODINGS = std::vector<std::string>{"DictionaryFSBA", "DictionarySIMDBP128", "Uncompressed",
-                                                  "LZ4", "RunLength", "FixedStringAndFrameOfReferenceFSBA",
-                                                  "FixedStringAndFrameOfReferenceSIMDBP128"}; 
+  const auto ENCODINGS = std::vector<std::string>{"DictionaryFSBA", "DictionarySIMDBP128", "Unencoded",
+                                                  "LZ4", "RunLength", "FixedStringFSBAAndFrameOfReferenceFSBA",
+                                                  "FixedStringSIMDBP128AndFrameOfReferenceSIMDBP128"}; 
   auto main_encoding = ENCODINGS[0];
 
   const auto env_var_benchmark = std::getenv("BENCHMARK_TO_RUN");
@@ -125,25 +125,27 @@ void Driver::start() {
   auto encoding_config = EncodingConfig{};
   if (main_encoding == "DictionaryFSBA") {
     encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::Dictionary, VectorCompressionType::FixedSizeByteAligned});
-  } else if (main_encoding == "DictionaryFSBA") {
+  } else if (main_encoding == "DictionarySIMDBP128") {
     encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::Dictionary, VectorCompressionType::SimdBp128});
+  } else if (main_encoding == "Unencoded") {
+    encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::Unencoded});
   } else if (main_encoding == "LZ4") {
     encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::LZ4});
   } else if (main_encoding == "RunLength") {
     encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::RunLength});
-  } else if (main_encoding == "FixedStringAndFrameOfReferenceFSBA") {
+  } else if (main_encoding == "FixedStringFSBAAndFrameOfReferenceFSBA") {
     // Passing a default of dictionary encoding, use FoR for integers and FString for strings.
     std::unordered_map<DataType, SegmentEncodingSpec> mapping = {
         {DataType::Int, SegmentEncodingSpec{EncodingType::FrameOfReference, VectorCompressionType::FixedSizeByteAligned}},
-        {DataType::String, SegmentEncodingSpec{EncodingType::FixedStringDictionary}}
+        {DataType::String, SegmentEncodingSpec{EncodingType::FixedStringDictionary, VectorCompressionType::FixedSizeByteAligned}}
       };
     encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::Dictionary, VectorCompressionType::FixedSizeByteAligned},
       mapping, std::unordered_map<std::string, std::unordered_map<std::string, SegmentEncodingSpec>>{});
-  } else if (main_encoding == "FixedStringAndFrameOfReferenceSIMDBP128") {
+  } else if (main_encoding == "FixedStringSIMDBP128AndFrameOfReferenceSIMDBP128") {
     // Passing a default of dictionary encoding, use FoR for integers and FString for strings.
     std::unordered_map<DataType, SegmentEncodingSpec> mapping = {
         {DataType::Int, SegmentEncodingSpec{EncodingType::FrameOfReference, VectorCompressionType::SimdBp128}},
-        {DataType::String, SegmentEncodingSpec{EncodingType::FixedStringDictionary}}
+        {DataType::String, SegmentEncodingSpec{EncodingType::FixedStringDictionary, VectorCompressionType::SimdBp128}}
       };
     encoding_config = EncodingConfig(SegmentEncodingSpec{EncodingType::Dictionary, VectorCompressionType::FixedSizeByteAligned},
       mapping, std::unordered_map<std::string, std::unordered_map<std::string, SegmentEncodingSpec>>{});
@@ -173,9 +175,9 @@ void Driver::start() {
   if (BENCHMARK == "TPC-H") {
     SCALE_FACTOR = 0.1f;
     config->max_runs = 1;
-    // const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
-    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{0}};
+    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
+    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
