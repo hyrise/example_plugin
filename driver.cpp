@@ -164,9 +164,9 @@ void Driver::start() {
   auto SCALE_FACTOR = 17.0f;  // later overwritten
 
 
-  // Set caches
-  Hyrise::get().default_pqp_cache = std::make_shared<SQLPhysicalPlanCache>(100'000);
-  Hyrise::get().default_lqp_cache = std::make_shared<SQLLogicalPlanCache>(100'000);
+  // Set caches (DOES NOT WORK ... set in abstract cache for now. Benchmarks reset the cache.)
+  // Hyrise::get().default_pqp_cache = std::make_shared<SQLPhysicalPlanCache>(100'000);
+  // Hyrise::get().default_lqp_cache = std::make_shared<SQLLogicalPlanCache>(100'000);
 
 
   //
@@ -196,7 +196,7 @@ void Driver::start() {
     config->max_runs = 1;
     const std::string query_path = "hyrise/resources/benchmark/tpcds/tpcds-result-reproduction/query_qualification";
     if (!std::filesystem::exists("resources/")) {
-      std::cout << "When resources for TPC-DS cannot be found on Linux, create a symlink as a workaround: 'ln -s hyrise/resources resources'." << std::endl;
+      std::cout << "When resources for TPC-DS cannot be found, create a symlink as a workaround: 'ln -s hyrise/resources resources'." << std::endl;
     }
 
     auto query_generator = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, filename_blacklist());

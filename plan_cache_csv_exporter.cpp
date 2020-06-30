@@ -63,7 +63,7 @@ PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name)
   general_operators_csv.open(_export_folder_name + "/general_operators.csv");
   aggregates_csv.open(_export_folder_name + "/aggregates.csv");
 
-  joins_csv << "OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|JOIN_MODE|LEFT_TABLE_NAME|LEFT_COLUMN_NAME|LEFT_TABLE_CHUNK_COUNT|LEFT_TABLE_ROW_COUNT|RIGHT_TABLE_NAME|RIGHT_COLUMN_NAME|RIGHT_TABLE_CHUNK_COUNT|RIGHT_TABLE_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|PREDICATE_COUNT|PRIMARY_PREDICATE|IS_FLIPPED|RADIX_BITS|";
+  joins_csv << "OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|JOIN_MODE|LEFT_TABLE_NAME|LEFT_COLUMN_NAME|LEFT_TABLE_CHUNK_COUNT|LEFT_TABLE_ROW_COUNT|LEFT_COLUMN_TYPE|RIGHT_TABLE_NAME|RIGHT_COLUMN_NAME|RIGHT_TABLE_CHUNK_COUNT|RIGHT_TABLE_ROW_COUNT|RIGHT_COLUMN_TYPE|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|PREDICATE_COUNT|PRIMARY_PREDICATE|IS_FLIPPED|RADIX_BITS|";
   for (const auto step_name : magic_enum::enum_names<JoinHash::OperatorSteps>()) {
     const auto step_name_str = std::string{step_name};
     joins_csv << camel_to_csv_row_title(step_name_str) << "_NS|";
@@ -144,85 +144,101 @@ std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const Abst
      << get_operator_hash(op->right_input()) << "|" << join_mode_to_string.left.at(join_node->join_mode) << "|";
   if (operator_predicate.has_value()) {
     const auto predicate_expression = std::dynamic_pointer_cast<const AbstractPredicateExpression>(join_node->node_expressions[0]);
-    std::string left_table_name, right_table_name;
-    ColumnID left_original_column_id, right_original_column_id;
+    std::string left_table_name{};
+    std::string right_table_name{};
+    ColumnID left_original_column_id{};
+    ColumnID right_original_column_id{};
+    std::string left_column_type{};
+    std::string right_column_type{};
 
-      const auto first_predicate_expression = predicate_expression->arguments[0];
-      if (first_predicate_expression->type == ExpressionType::LQPColumn) {
-        const auto left_column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(first_predicate_expression);
-        left_original_column_id = left_column_expression->original_column_id;
+    const auto first_predicate_expression = predicate_expression->arguments[0];
+    if (first_predicate_expression->type == ExpressionType::LQPColumn) {
+      const auto left_column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(first_predicate_expression);
+      left_original_column_id = left_column_expression->original_column_id;
 
-        const auto original_node_0 = left_column_expression->original_node.lock();
-        if (original_node_0->type == LQPNodeType::StoredTable) {
-          const auto stored_table_node_0 = std::dynamic_pointer_cast<const StoredTableNode>(original_node_0);
-          left_table_name = stored_table_node_0->table_name;
+      const auto original_node_0 = left_column_expression->original_node.lock();
+      if (original_node_0->type == LQPNodeType::StoredTable) {
+        const auto stored_table_node_0 = std::dynamic_pointer_cast<const StoredTableNode>(original_node_0);
+        left_table_name = stored_table_node_0->table_name;
+
+        if (original_node_0 == node->left_input()) {
+          left_column_type = "DATA";
+        } else {
+          left_column_type = "REFERENCE";
         }
       }
+    }
 
-      const auto second_predicate_expression = predicate_expression->arguments[1];
-      if (second_predicate_expression->type == ExpressionType::LQPColumn) {
-        const auto right_column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(second_predicate_expression);
-        right_original_column_id = right_column_expression->original_column_id;
-        
-        const auto original_node_1 = right_column_expression->original_node.lock();
-        if (original_node_1->type == LQPNodeType::StoredTable) {
-          const auto stored_table_node_1 = std::dynamic_pointer_cast<const StoredTableNode>(original_node_1);
-          right_table_name = stored_table_node_1->table_name;
+    const auto second_predicate_expression = predicate_expression->arguments[1];
+    if (second_predicate_expression->type == ExpressionType::LQPColumn) {
+      const auto right_column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(second_predicate_expression);
+      right_original_column_id = right_column_expression->original_column_id;
+      
+      const auto original_node_1 = right_column_expression->original_node.lock();
+      if (original_node_1->type == LQPNodeType::StoredTable) {
+        const auto stored_table_node_1 = std::dynamic_pointer_cast<const StoredTableNode>(original_node_1);
+        right_table_name = stored_table_node_1->table_name;
+
+        if (original_node_1 == node->right_input()) {
+          right_column_type = "DATA";
+        } else {
+          right_column_type = "REFERENCE";
         }
       }
+    }
 
-      std::string column_name_0, column_name_1;
-      // In cases where the join partner is not a column, we fall back to empty column names.
-      // Exemplary query is the rewrite of TPC-H Q2 where `min(ps_supplycost)` is joined with `ps_supplycost`.
-      if (left_table_name != "") {
-        const auto sm_table_0 = _sm.get_table(left_table_name);
-        column_name_0 = sm_table_0->column_names()[left_original_column_id];
+    std::string column_name_0, column_name_1;
+    // In cases where the join partner is not a column, we fall back to empty column names.
+    // Exemplary query is the rewrite of TPC-H Q2 where `min(ps_supplycost)` is joined with `ps_supplycost`.
+    if (left_table_name != "") {
+      const auto sm_table_0 = _sm.get_table(left_table_name);
+      column_name_0 = sm_table_0->column_names()[left_original_column_id];
+    }
+    if (right_table_name != "") {
+      const auto sm_table_1 = _sm.get_table(right_table_name);
+      column_name_1 = sm_table_1->column_names()[right_original_column_id];
+    }
+
+    auto description = op->description();
+    description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
+    description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
+
+    const auto& left_input_perf_data = op->left_input()->performance_data;
+    const auto& right_input_perf_data = op->right_input()->performance_data;
+
+    // Check if the join predicate has been switched (hence, it differs between LQP and PQP) which is done when
+    // table A and B are joined but the join predicate is "flipped" (e.g., b.x = a.x). The effect of flipping is that
+    // the predicates are in the order (left/right) as the join input tables are.
+    if (!operator_predicate->is_flipped()) {
+      ss << left_table_name << "|" << column_name_0 << "|" << left_input_perf_data->output_chunk_count
+         << "|" << left_input_perf_data->output_row_count << "|" << left_column_type << "|";
+      ss << right_table_name << "|" << column_name_1 << "|" << right_input_perf_data->output_chunk_count
+         << "|" << right_input_perf_data->output_row_count << "|" << right_column_type << "|";
+    } else {
+      ss << right_table_name << "|" << column_name_1 << "|" << left_input_perf_data->output_chunk_count
+         << "|" << left_input_perf_data->output_row_count << "|" << right_column_type << "|";
+      ss << left_table_name << "|" << column_name_0 << "|" << right_input_perf_data->output_chunk_count
+         << "|" << right_input_perf_data->output_row_count << "|" << left_column_type << "|";
+    }
+
+    const auto& perf_data = op->performance_data;
+    ss << perf_data->output_chunk_count << "|" << perf_data->output_row_count << "|";
+    ss << join_node->node_expressions.size() << "|" << predicate_condition_to_string.left.at((*operator_predicate).predicate_condition) << "|";
+    if (const auto join_hash_op = dynamic_pointer_cast<const JoinHash>(op)) {
+      const auto& join_hash_perf_data = dynamic_cast<const JoinHash::PerformanceData&>(*join_hash_op->performance_data);
+      const auto build_and_probe_side_flipped = join_hash_perf_data.right_input_is_build_side ? "TRUE" : "FALSE";
+      ss << build_and_probe_side_flipped << "|" << join_hash_perf_data.radix_bits << "|";
+
+      for (const auto step_name : magic_enum::enum_values<JoinHash::OperatorSteps>()) {
+        ss << join_hash_perf_data.get_step_runtime(step_name).count() << "|";
       }
-      if (right_table_name != "") {
-        const auto sm_table_1 = _sm.get_table(right_table_name);
-        column_name_1 = sm_table_1->column_names()[right_original_column_id];
+    } else {
+      ss << "FALSE|NULL|";
+      for (auto index = size_t{0}; index < magic_enum::enum_count<JoinHash::OperatorSteps>(); ++index) {
+        ss << "NULL|";
       }
-
-      auto description = op->description();
-      description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
-      description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
-
-      const auto& left_input_perf_data = op->left_input()->performance_data;
-      const auto& right_input_perf_data = op->right_input()->performance_data;
-
-      // Check if the join predicate has been switched (hence, it differs between LQP and PQP) which is done when
-      // table A and B are joined but the join predicate is "flipped" (e.g., b.x = a.x). The effect of flipping is that
-      // the predicates are in the order (left/right) as the join input tables are.
-      if (!operator_predicate->is_flipped()) {
-        ss << left_table_name << "|" << column_name_0 << "|" << left_input_perf_data->output_chunk_count
-           << "|" << left_input_perf_data->output_row_count << "|";
-        ss << right_table_name << "|" << column_name_1 << "|" << right_input_perf_data->output_chunk_count
-           << "|" << right_input_perf_data->output_row_count << "|";
-      } else {
-        ss << right_table_name << "|" << column_name_1 << "|" << left_input_perf_data->output_chunk_count
-           << "|" << left_input_perf_data->output_row_count << "|";
-        ss << left_table_name << "|" << column_name_0 << "|" << right_input_perf_data->output_chunk_count
-           << "|" << right_input_perf_data->output_row_count << "|";
-      }
-
-      const auto& perf_data = op->performance_data;
-      ss << perf_data->output_chunk_count << "|" << perf_data->output_row_count << "|";
-      ss << join_node->node_expressions.size() << "|" << predicate_condition_to_string.left.at((*operator_predicate).predicate_condition) << "|";
-      if (const auto join_hash_op = dynamic_pointer_cast<const JoinHash>(op)) {
-        const auto& join_hash_perf_data = dynamic_cast<const JoinHash::PerformanceData&>(*join_hash_op->performance_data);
-        const auto build_and_probe_side_flipped = join_hash_perf_data.right_input_is_build_side ? "TRUE" : "FALSE";
-        ss << build_and_probe_side_flipped << "|" << join_hash_perf_data.radix_bits << "|";
-
-        for (const auto step_name : magic_enum::enum_values<JoinHash::OperatorSteps>()) {
-          ss << join_hash_perf_data.get_step_runtime(step_name).count() << "|";
-        }
-      } else {
-        ss << "FALSE|NULL|";
-        for (auto index = size_t{0}; index < magic_enum::enum_count<JoinHash::OperatorSteps>(); ++index) {
-          ss << "NULL|";
-        }
-      }
-      ss << perf_data->walltime.count() << "|" << description << "\n";
+    }
+    ss << perf_data->walltime.count() << "|" << description << "\n";
   } else {
     ss << "UNEXPECTED join operator_predicate.has_value()";
     std::cout << op << std::endl;
