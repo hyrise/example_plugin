@@ -80,6 +80,7 @@ void extract_table_meta_data(const std::string folder_name) {
   table_to_csv("meta_segments_accurate", folder_name + "/segment_meta_data.csv");
   table_to_csv("meta_tables", folder_name + "/table_meta_data.csv");
   table_to_csv("meta_columns", folder_name + "/column_meta_data.csv");
+  table_to_csv("meta_chunks", folder_name + "/chunk_meta_data.csv");
 }
 
 }  // namespace
