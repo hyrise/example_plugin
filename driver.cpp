@@ -9,6 +9,7 @@
 #include "hyrise.hpp"
 #include "benchmark_config.hpp"
 #include "benchmark_runner.hpp"
+#include "abstract_table_generator.hpp"
 #include "file_based_benchmark_item_runner.hpp"
 #include "file_based_table_generator.hpp"
 #include "sql/sql_pipeline_builder.hpp"
@@ -174,11 +175,11 @@ void Driver::start() {
   //  TPC-H
   //
   if (BENCHMARK == "TPC-H") {
-    SCALE_FACTOR = 0.1f;
+    SCALE_FACTOR = 10.0f;
     config->max_runs = 1;
-    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{0}};
+    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
     auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    //auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
@@ -200,7 +201,7 @@ void Driver::start() {
       std::cout << "When resources for TPC-DS cannot be found, create a symlink as a workaround: 'ln -s hyrise/resources resources'." << std::endl;
     }
 
-    auto query_generator = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, filename_blacklist());
+    auto query_generator = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, filename_blacklist(), std::unordered_set<std::string>{"1"});
     auto table_generator = std::make_unique<TpcdsTableGenerator>(SCALE_FACTOR, config);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(*config, std::move(query_generator), std::move(table_generator),
                                                               opossum::BenchmarkRunner::create_context(*config));
@@ -215,13 +216,13 @@ void Driver::start() {
   //  JOB
   //
   else if (BENCHMARK == "JOB") {
-    config->max_runs = 1;
+    config->max_runs = 10;
 
     const auto table_path = "hyrise/imdb_data";
     const auto query_path = "hyrise/third_party/join-order-benchmark";
     const auto non_query_file_names = std::unordered_set<std::string>{"fkindexes.sql", "schema.sql"};
 
-    auto benchmark_item_runner = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, non_query_file_names);
+    auto benchmark_item_runner = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, non_query_file_names, std::unordered_set<std::string>{"10a"});
     auto table_generator = std::make_unique<FileBasedTableGenerator>(config, table_path);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(*config, std::move(benchmark_item_runner), std::move(table_generator),
                                                               BenchmarkRunner::create_context(*config));
