@@ -13,6 +13,8 @@
 #include "file_based_benchmark_item_runner.hpp"
 #include "file_based_table_generator.hpp"
 #include "sql/sql_pipeline_builder.hpp"
+#include "tpcc/tpcc_benchmark_item_runner.hpp"
+#include "tpcc/tpcc_table_generator.hpp"
 #include "tpch/tpch_benchmark_item_runner.hpp"
 #include "tpch/tpch_table_generator.hpp"
 #define MACOS OS
@@ -89,7 +91,7 @@ void extract_table_meta_data(const std::string folder_name) {
 std::string Driver::description() const { return "This driver executes benchmarks and outputs its plan cache to an array of CSV files."; }
 
 void Driver::start() {
-  const auto BENCHMARKS = std::vector<std::string>{"TPC-H", "TPC-DS", "JOB"}; 
+  const auto BENCHMARKS = std::vector<std::string>{"TPC-H", "TPC-DS", "JOB", "TPC-C"}; 
   const auto ENCODINGS = std::vector<std::string>{"DictionaryFSBA", "DictionarySIMDBP128", "Unencoded",
                                                   "LZ4", "RunLength", "FixedStringFSBAAndFrameOfReferenceFSBA",
                                                   "FixedStringSIMDBP128AndFrameOfReferenceSIMDBP128"}; 
@@ -155,12 +157,12 @@ void Driver::start() {
 
   auto config = std::make_shared<BenchmarkConfig>(BenchmarkConfig::get_default_config());
   config->encoding_config = encoding_config;
-  config->max_runs = 10;
+  config->max_runs = 0;
   config->enable_visualization = false;
-  config->cache_binary_tables = true;
+  config->cache_binary_tables = BENCHMARK != "TPC-C" ? true : false;
   config->max_duration = std::chrono::seconds(300);
   config->warmup_duration = std::chrono::seconds(0);
-  config->cache_binary_tables = false; // might be necessary due to some problems with binary exports :(
+  //config->cache_binary_tables = false; // might be necessary due to some problems with binary exports :(
 
   constexpr auto USE_PREPARED_STATEMENTS = false;
   auto SCALE_FACTOR = 17.0f;  // later overwritten
@@ -175,11 +177,11 @@ void Driver::start() {
   //  TPC-H
   //
   if (BENCHMARK == "TPC-H") {
-    SCALE_FACTOR = 10.0f;
+    SCALE_FACTOR = 1.0f;
     config->max_runs = 1;
-    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
+    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{0}};
     auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    //auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
@@ -195,7 +197,7 @@ void Driver::start() {
   //
   else if (BENCHMARK == "TPC-DS") {
     SCALE_FACTOR = 1.0f;
-    config->max_runs = 1;
+    config->max_runs = 5;
     const std::string query_path = "hyrise/resources/benchmark/tpcds/tpcds-result-reproduction/query_qualification";
     if (!std::filesystem::exists("resources/")) {
       std::cout << "When resources for TPC-DS cannot be found, create a symlink as a workaround: 'ln -s hyrise/resources resources'." << std::endl;
@@ -232,6 +234,31 @@ void Driver::start() {
   }
   //
   //  /JOB
+  //
+
+  //
+  //  TPC-C
+  //
+  else if (BENCHMARK == "TPC-C") {
+    constexpr auto WAREHOUSES = int{5};
+
+    config->max_duration = std::chrono::seconds(60);
+    config->max_runs = -1;
+    config->benchmark_mode = BenchmarkMode::Shuffled;
+
+    auto context = BenchmarkRunner::create_context(*config);
+    context.emplace("scale_factor", WAREHOUSES);
+
+    auto item_runner = std::make_unique<TPCCBenchmarkItemRunner>(config, WAREHOUSES);
+    auto benchmark_runner = std::make_shared<BenchmarkRunner>(*config, std::move(item_runner),
+                                                              std::make_unique<TPCCTableGenerator>(WAREHOUSES, config),
+                                                              context);
+
+    Hyrise::get().benchmark_runner = benchmark_runner;
+    benchmark_runner->run();
+  }
+  //
+  //  /TPC-C
   //
 
   std::string folder_name = std::string(BENCHMARK) + "__SF_" + std::to_string(SCALE_FACTOR);
