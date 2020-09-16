@@ -97,6 +97,8 @@ void Driver::start() {
                                                   "FixedStringSIMDBP128AndFrameOfReferenceSIMDBP128"}; 
   auto main_encoding = ENCODINGS[0];
 
+  constexpr auto RELEASE = true;
+
   const auto env_var_benchmark = std::getenv("BENCHMARK_TO_RUN");
   if (env_var_benchmark == NULL) {
     std::cerr << "Please pass environment variable \"BENCHMARK_TO_RUN\" to set a target benchmark.\nExiting Plugin." << std::flush;
@@ -157,12 +159,12 @@ void Driver::start() {
 
   auto config = std::make_shared<BenchmarkConfig>(BenchmarkConfig::get_default_config());
   config->encoding_config = encoding_config;
-  config->max_runs = 0;
+  config->max_runs = 10;
   config->enable_visualization = false;
   //config->cache_binary_tables = BENCHMARK != "TPC-C" ? true : false;
-  config->cache_binary_tables = false;
+  config->cache_binary_tables = false;  // There might still be problems with binaries files, safe but slow route
   config->max_duration = std::chrono::seconds(300);
-  config->warmup_duration = std::chrono::seconds(5);
+  config->warmup_duration = std::chrono::seconds(0);
   //config->cache_binary_tables = false; // might be necessary due to some problems with binary exports :(
 
   constexpr auto USE_PREPARED_STATEMENTS = false;
@@ -173,16 +175,16 @@ void Driver::start() {
   // Hyrise::get().default_pqp_cache = std::make_shared<SQLPhysicalPlanCache>(100'000);
   // Hyrise::get().default_lqp_cache = std::make_shared<SQLLogicalPlanCache>(100'000);
 
-
   //
   //  TPC-H
   //
   if (BENCHMARK == "TPC-H") {
-    SCALE_FACTOR = 10.0f;
-    config->max_runs = 100;
-    //const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{0}};
-    //auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    SCALE_FACTOR = RELEASE ? 10.0f : 0.1f;
+    config->max_runs = RELEASE ? 100 : 1;
+
+    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
+    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
+    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;

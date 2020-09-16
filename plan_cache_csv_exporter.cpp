@@ -520,69 +520,57 @@ void PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const Abstra
 void PlanCacheCsvExporter::_process_projection(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash) {
   std::vector<SingleProjection> projections;
 
-  // const auto input_is_materialized = _operator_result_is_probably_materialized(op->left_input());
+  const auto input_is_materialized = _operator_result_is_probably_materialized(op->left_input());
 
   const auto node = op->lqp_node;
   const auto projection_node = std::dynamic_pointer_cast<const ProjectionNode>(node);
 
+  const auto& perf_data = op->performance_data;
+  const auto& left_input_perf_data = op->left_input()->performance_data;
+
+  auto description = op->lqp_node->description();
+  description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
+  description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
+
   for (const auto& el : projection_node->node_expressions) {
-    visit_expression(el, [&](const auto& expression) {
-      if (expression->type == ExpressionType::LQPColumn) {
-        const auto column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(expression);
-        const auto original_node = column_expression->original_node.lock();
+    if (input_is_materialized) {
+      projections.emplace_back(SingleProjection{query_hex_hash, get_operator_hash(op),
+        get_operator_hash(op->left_input()), "NULL", "DATA", "NULL",
+        "NULL", el->requires_computation(), left_input_perf_data->output_chunk_count, left_input_perf_data->output_row_count,
+        perf_data->output_chunk_count, perf_data->output_row_count,
+        static_cast<size_t>(perf_data->walltime.count()), description});      
+    } else {
+      visit_expression(el, [&](const auto& expression) {
+        if (expression->type == ExpressionType::LQPColumn) {
+          const auto column_expression = std::dynamic_pointer_cast<LQPColumnExpression>(expression);
+          const auto original_node = column_expression->original_node.lock();
 
-        if (original_node->type == LQPNodeType::StoredTable) {
-          const auto stored_table_node = std::dynamic_pointer_cast<const StoredTableNode>(original_node);
-          const auto& table_name = stored_table_node->table_name;
-        
-          const auto original_column_id = column_expression->original_column_id;
-          const std::string column_type = (original_node == node->left_input()) ? "DATA" : "REFERENCE";
-        
-          const auto& perf_data = op->performance_data;
-          const auto& left_input_perf_data = op->left_input()->performance_data;
-          const auto sm_table = _sm.get_table(table_name);
-          std::string column_name = "";
-          if (original_column_id != INVALID_COLUMN_ID) {
-            column_name = sm_table->column_names()[original_column_id];
-          } else {
-            column_name = "COUNT(*)";
+          if (original_node->type == LQPNodeType::StoredTable) {
+            const auto stored_table_node = std::dynamic_pointer_cast<const StoredTableNode>(original_node);
+            const auto& table_name = stored_table_node->table_name;
+          
+            const auto original_column_id = column_expression->original_column_id;
+            const std::string column_type = (original_node == node->left_input()) ? "DATA" : "REFERENCE";
+          
+            const auto sm_table = _sm.get_table(table_name);
+            std::string column_name = "";
+            if (original_column_id != INVALID_COLUMN_ID) {
+              column_name = sm_table->column_names()[original_column_id];
+            } else {
+              column_name = "COUNT(*)";
+            }
+
+            projections.emplace_back(SingleProjection{query_hex_hash, get_operator_hash(op),
+              get_operator_hash(op->left_input()), "NULL", column_type, table_name,
+              column_name, el->requires_computation(), left_input_perf_data->output_chunk_count, left_input_perf_data->output_row_count,
+              perf_data->output_chunk_count, perf_data->output_row_count,
+              static_cast<size_t>(perf_data->walltime.count()), description});
           }
-          auto description = op->lqp_node->description();
-          description.erase(std::remove(description.begin(), description.end(), '\n'), description.end());
-          description.erase(std::remove(description.begin(), description.end(), '"'), description.end());
-
-          projections.emplace_back(SingleProjection{query_hex_hash, get_operator_hash(op),
-            get_operator_hash(op->left_input()), "NULL", column_type, table_name,
-            column_name, left_input_perf_data->output_chunk_count, left_input_perf_data->output_row_count,
-            perf_data->output_chunk_count, perf_data->output_row_count,
-            static_cast<size_t>(perf_data->walltime.count()), description});
         }
-      }
-      // TODO: does that help???
-      // else {
-      //   if (expression->type == ExpressionType::Function) {
-      //     std::cout << "Function " << expression->as_column_name() << " - " << expression->arguments.size() << std::endl;
-      //     for (const auto& t : expression->arguments) {
-      //       if (t->type == ExpressionType::LQPColumn) {
-      //         std::cout << "#" << t->as_column_name() << std::endl;
-      //       }
-      //     }
-      //   }
-      //   if (expression->type == ExpressionType::Arithmetic) {
-      //     std::cout << "Arithmetic " << expression->as_column_name() << " - " << expression->arguments.size() << std::endl;
-      //     for (const auto& t : expression->arguments) {
-      //       if (t->type == ExpressionType::LQPColumn) {
-      //         std::cout << "#" << t->as_column_name() << std::endl;
-      //       }
-      //     }
-      //   }
-      //   stringstreams[visit_write_id] += query_hex_hash + "|" + proj_hex_hash_str;
-      //   stringstreams[visit_write_id] += ",CALC_PROJECTION|";
-      //   stringstreams[visit_write_id] += ",,,,,\"[Projection] Calculation: ";
-      //   stringstreams[visit_write_id] += expression->as_column_name() + "\"";
-      // }
-      return ExpressionVisitation::VisitArguments;
-    });
+
+        return ExpressionVisitation::VisitArguments;
+      });
+    }
   }
 
   _projections.instances.insert(_projections.instances.end(), projections.begin(), projections.end());

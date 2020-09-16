@@ -118,6 +118,7 @@ struct SingleProjection {
   std::string column_type{};
   std::string table_name{};
   std::string column_name{};
+  size_t requires_computation{};
   size_t input_chunk_count{};
   size_t input_row_count{};
   size_t output_chunk_count{};
@@ -136,6 +137,7 @@ struct SingleProjection {
     result.emplace_back(wrap_string_old(column_type));
     result.emplace_back(wrap_string_old(table_name));
     result.emplace_back(wrap_string_old(column_name));
+    result.emplace_back(std::to_string(requires_computation));
     result.emplace_back(std::to_string(input_chunk_count));
     result.emplace_back(std::to_string(input_row_count));
     result.emplace_back(std::to_string(output_chunk_count));
@@ -149,7 +151,7 @@ struct SingleProjection {
 
 struct WorkloadProjections {
   std::string csv_header() const {
-    return "OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION";
+    return "OPERATOR_TYPE|QUERY_HASH|OPERATOR_HASH|LEFT_INPUT_OPERATOR_HASH|RIGHT_INPUT_OPERATOR_HASH|COLUMN_TYPE|TABLE_NAME|COLUMN_NAME|REQUIRES_COMPUTATION|INPUT_CHUNK_COUNT|INPUT_ROW_COUNT|OUTPUT_CHUNK_COUNT|OUTPUT_ROW_COUNT|RUNTIME_NS|DESCRIPTION";
   }
 
   std::vector<SingleProjection> instances;
