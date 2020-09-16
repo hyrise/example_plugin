@@ -199,7 +199,7 @@ void Driver::start() {
   //  TPC-DS
   //
   else if (BENCHMARK == "TPC-DS") {
-    SCALE_FACTOR = 1.0f;
+    SCALE_FACTOR = RELEASE ? 5.0f : 1.0f;
     config->max_runs = 100;
     const std::string query_path = "hyrise/resources/benchmark/tpcds/tpcds-result-reproduction/query_qualification";
     if (!std::filesystem::exists("resources/")) {
