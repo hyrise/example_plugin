@@ -91,7 +91,7 @@ void extract_table_meta_data(const std::string folder_name) {
 std::string Driver::description() const { return "This driver executes benchmarks and outputs its plan cache to an array of CSV files."; }
 
 void Driver::start() {
-  const auto BENCHMARKS = std::vector<std::string>{"TPC-H", "TPC-DS", "JOB", "TPC-C"}; 
+  const auto BENCHMARKS = std::vector<std::string>{"TPC-C", "TPC-DS", "JOB", "TPC-H"}; 
   const auto ENCODINGS = std::vector<std::string>{"DictionaryFSBA", "DictionarySIMDBP128", "Unencoded",
                                                   "LZ4", "RunLength", "FixedStringFSBAAndFrameOfReferenceFSBA",
                                                   "FixedStringSIMDBP128AndFrameOfReferenceSIMDBP128"}; 
@@ -159,9 +159,10 @@ void Driver::start() {
   config->encoding_config = encoding_config;
   config->max_runs = 0;
   config->enable_visualization = false;
-  config->cache_binary_tables = BENCHMARK != "TPC-C" ? true : false;
+  //config->cache_binary_tables = BENCHMARK != "TPC-C" ? true : false;
+  config->cache_binary_tables = false;
   config->max_duration = std::chrono::seconds(300);
-  config->warmup_duration = std::chrono::seconds(0);
+  config->warmup_duration = std::chrono::seconds(5);
   //config->cache_binary_tables = false; // might be necessary due to some problems with binary exports :(
 
   constexpr auto USE_PREPARED_STATEMENTS = false;
@@ -177,11 +178,11 @@ void Driver::start() {
   //  TPC-H
   //
   if (BENCHMARK == "TPC-H") {
-    SCALE_FACTOR = 1.0f;
-    config->max_runs = 1;
-    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{0}};
-    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    SCALE_FACTOR = 10.0f;
+    config->max_runs = 100;
+    //const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{0}};
+    //auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
+    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
@@ -197,13 +198,14 @@ void Driver::start() {
   //
   else if (BENCHMARK == "TPC-DS") {
     SCALE_FACTOR = 1.0f;
-    config->max_runs = 5;
+    config->max_runs = 100;
     const std::string query_path = "hyrise/resources/benchmark/tpcds/tpcds-result-reproduction/query_qualification";
     if (!std::filesystem::exists("resources/")) {
       std::cout << "When resources for TPC-DS cannot be found, create a symlink as a workaround: 'ln -s hyrise/resources resources'." << std::endl;
     }
 
-    auto query_generator = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, filename_blacklist(), std::unordered_set<std::string>{"1"});
+    //auto query_generator = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, filename_blacklist(), std::unordered_set<std::string>{"1"});
+    auto query_generator = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, filename_blacklist());
     auto table_generator = std::make_unique<TpcdsTableGenerator>(SCALE_FACTOR, config);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(*config, std::move(query_generator), std::move(table_generator),
                                                               opossum::BenchmarkRunner::create_context(*config));
@@ -224,7 +226,8 @@ void Driver::start() {
     const auto query_path = "hyrise/third_party/join-order-benchmark";
     const auto non_query_file_names = std::unordered_set<std::string>{"fkindexes.sql", "schema.sql"};
 
-    auto benchmark_item_runner = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, non_query_file_names, std::unordered_set<std::string>{"10a"});
+    //auto benchmark_item_runner = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, non_query_file_names, std::unordered_set<std::string>{"10a"});
+    auto benchmark_item_runner = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, non_query_file_names);
     auto table_generator = std::make_unique<FileBasedTableGenerator>(config, table_path);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(*config, std::move(benchmark_item_runner), std::move(table_generator),
                                                               BenchmarkRunner::create_context(*config));
@@ -242,9 +245,13 @@ void Driver::start() {
   else if (BENCHMARK == "TPC-C") {
     constexpr auto WAREHOUSES = int{5};
 
-    config->max_duration = std::chrono::seconds(60);
+    config->max_duration = std::chrono::seconds{10};
     config->max_runs = -1;
     config->benchmark_mode = BenchmarkMode::Shuffled;
+    config->warmup_duration = std::chrono::seconds(0);
+    config->enable_scheduler = true;
+    config->clients = 1;
+    config->cores = 1;
 
     auto context = BenchmarkRunner::create_context(*config);
     context.emplace("scale_factor", WAREHOUSES);

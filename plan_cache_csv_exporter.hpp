@@ -233,7 +233,7 @@ class PlanCacheCsvExporter {
   PlanCacheCsvExporter(const std::string export_folder_name);
   void run();
   void write_to_disk() const;
-  void write_map_to_disk(const auto file_name, const auto& operator_instances) const;
+  void write_map_to_disk(const std::string file_name, const std::map<std::string, std::vector<std::string>>& operator_instances) const;
  private:
   StorageManager& _sm;
 

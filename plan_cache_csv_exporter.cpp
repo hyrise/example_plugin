@@ -148,7 +148,7 @@ void PlanCacheCsvExporter::write_to_disk() const {
   write_lines(_export_folder_name + "/projections.csv", _projections);
 }
 
-void PlanCacheCsvExporter::write_map_to_disk(const auto file_name, const auto& operator_instances) const {
+void PlanCacheCsvExporter::write_map_to_disk(const std::string file_name, const std::map<std::string, std::vector<std::string>>& operator_instances) const {
   const auto separator = "|";
 
   std::ofstream output_csv;
