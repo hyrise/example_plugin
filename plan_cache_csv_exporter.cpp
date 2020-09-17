@@ -506,7 +506,7 @@ void PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const Abstra
 
       if (aggregate_expression && is_count_star) {
         operator_instance["IS_COUNT_STAR"] = "1";
-      } else if (!aggregate_expression && aggregate_expression->argument()->type == ExpressionType::LQPColumn && !input_is_materialized) {
+      } else if (!input_is_materialized && aggregate_expression && aggregate_expression->argument()->type == ExpressionType::LQPColumn) {
         add_stored_column_access(aggregate_expression->argument(), operator_instance);
       }
 

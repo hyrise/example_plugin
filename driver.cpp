@@ -182,9 +182,9 @@ void Driver::start() {
     SCALE_FACTOR = RELEASE ? 10.0f : 0.1f;
     config->max_runs = RELEASE ? 100 : 1;
 
-    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
-    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    // const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{0}};
+    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
+    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
