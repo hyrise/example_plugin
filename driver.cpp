@@ -6,12 +6,13 @@
 #include "driver.hpp"
 #include "plan_cache_csv_exporter.hpp"
 
-#include "hyrise.hpp"
+#include "abstract_table_generator.hpp"
 #include "benchmark_config.hpp"
 #include "benchmark_runner.hpp"
-#include "abstract_table_generator.hpp"
+#include "cli_config_parser.hpp"
 #include "file_based_benchmark_item_runner.hpp"
 #include "file_based_table_generator.hpp"
+#include "hyrise.hpp"
 #include "sql/sql_pipeline_builder.hpp"
 #include "tpcc/tpcc_benchmark_item_runner.hpp"
 #include "tpcc/tpcc_table_generator.hpp"
@@ -97,7 +98,7 @@ void Driver::start() {
                                                   "FixedStringSIMDBP128AndFrameOfReferenceSIMDBP128"}; 
   auto main_encoding = ENCODINGS[0];
 
-  constexpr auto RELEASE = true;
+  constexpr auto RELEASE = false;
 
   const auto env_var_benchmark = std::getenv("BENCHMARK_TO_RUN");
   if (env_var_benchmark == NULL) {
@@ -106,9 +107,10 @@ void Driver::start() {
   }
 
   const auto env_var_encoding = std::getenv("ENCODING_TO_USE");
-  if (env_var_encoding == NULL) {
+  const auto env_var_encoding_config = std::getenv("ENCODING_CONFIG");
+  if (env_var_encoding == NULL && env_var_encoding_config == NULL) {
     std::cout << "Encoding data with the default of " << main_encoding << std::endl;
-  } else {
+  } else if (env_var_encoding != NULL) {
     main_encoding = std::string{env_var_encoding};
     std::cout << "Encoding data with " << main_encoding << std::endl;
   } 
@@ -159,6 +161,10 @@ void Driver::start() {
 
   auto config = std::make_shared<BenchmarkConfig>(BenchmarkConfig::get_default_config());
   config->encoding_config = encoding_config;
+  if (env_var_encoding_config != NULL) {
+    std::cout << "Using a custom encoding config: " << std::string{env_var_encoding_config} << std::endl;
+    config->encoding_config = EncodingConfig(CLIConfigParser::parse_encoding_config(std::string{env_var_encoding_config}));
+  }
   config->max_runs = 10;
   config->enable_visualization = false;
   //config->cache_binary_tables = BENCHMARK != "TPC-C" ? true : false;
@@ -179,12 +185,12 @@ void Driver::start() {
   //  TPC-H
   //
   if (BENCHMARK == "TPC-H") {
-    SCALE_FACTOR = RELEASE ? 10.0f : 0.1f;
+    SCALE_FACTOR = RELEASE ? 10.0f : 1.0f;
     config->max_runs = RELEASE ? 100 : 1;
 
-    // const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{0}};
-    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{2}};
+    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
+    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
