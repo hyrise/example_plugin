@@ -163,6 +163,10 @@ void Driver::start() {
   config->encoding_config = encoding_config;
   if (env_var_encoding_config != NULL) {
     std::cout << "Using a custom encoding config: " << std::string{env_var_encoding_config} << std::endl;
+    auto folder_name = std::string{env_var_encoding_config};
+    folder_name = folder_name.substr(folder_name.rfind("/") + 1);
+    folder_name = folder_name.substr(0, folder_name.size() - 5);
+    main_encoding = folder_name;
     config->encoding_config = EncodingConfig(CLIConfigParser::parse_encoding_config(std::string{env_var_encoding_config}));
   }
   config->max_runs = 10;
