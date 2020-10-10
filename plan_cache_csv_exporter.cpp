@@ -497,7 +497,7 @@ void PlanCacheCsvExporter::_process_aggregate(const std::shared_ptr<const Abstra
     } else {
       // It is not a direct column reference. This part handles count(*), aggregations (e.g., SUM),
       // or functions (e.g., CASE), or accesses to a materialized table.
-      Assert(el->type == ExpressionType::Aggregate || el->type == ExpressionType::Function ||
+      Assert(el->type == ExpressionType::Aggregate || el->type == ExpressionType::Function || el->type == ExpressionType::Arithmetic ||
              (input_is_materialized && el->type == ExpressionType::LQPColumn),
              "Found an unexpected expression in an aggregate node: " + std::string{magic_enum::enum_name(el->type)});
 

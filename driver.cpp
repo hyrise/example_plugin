@@ -1,4 +1,5 @@
 #include <fstream>
+#include <thread>
 #include <unordered_set>
 
 #include <boost/algorithm/string.hpp>
@@ -13,6 +14,7 @@
 #include "file_based_benchmark_item_runner.hpp"
 #include "file_based_table_generator.hpp"
 #include "hyrise.hpp"
+#include "operators/print.hpp"
 #include "sql/sql_pipeline_builder.hpp"
 #include "tpcc/tpcc_benchmark_item_runner.hpp"
 #include "tpcc/tpcc_table_generator.hpp"
@@ -20,8 +22,13 @@
 #include "tpch/tpch_table_generator.hpp"
 #define MACOS OS
 #include "tpcds/tpcds_table_generator.hpp"
+#include "utils/timer.hpp"
 
 using namespace opossum;  // NOLINT
+using namespace std::chrono_literals;
+
+// We do not use the MVCC delete plugin for now, as we write by far to few lines in TPC-C to make a difference.
+constexpr auto USE_MVCC_DELETE = false;
 
 namespace {
 
@@ -92,7 +99,7 @@ void extract_table_meta_data(const std::string folder_name) {
 std::string Driver::description() const { return "This driver executes benchmarks and outputs its plan cache to an array of CSV files."; }
 
 void Driver::start() {
-  const auto BENCHMARKS = std::vector<std::string>{"TPC-C", "TPC-DS", "JOB", "TPC-H"}; 
+  const auto BENCHMARKS = std::vector<std::string>{"TPC-C", "TPC-DS", "JOB", "TPC-H", "CH"}; 
   const auto ENCODINGS = std::vector<std::string>{"DictionaryFSBA", "DictionarySIMDBP128", "Unencoded",
                                                   "LZ4", "RunLength", "FixedStringFSBAAndFrameOfReferenceFSBA",
                                                   "FixedStringSIMDBP128AndFrameOfReferenceSIMDBP128"}; 
@@ -254,27 +261,118 @@ void Driver::start() {
   //
   //  TPC-C
   //
-  else if (BENCHMARK == "TPC-C") {
-    constexpr auto WAREHOUSES = int{5};
-
+  else if (BENCHMARK == "TPC-C" or BENCHMARK == "CH") {
+    auto warehouse_count = int{1};
     config->max_duration = std::chrono::seconds{20};
+
+    if (BENCHMARK == "CH") {
+      warehouse_count = 10;
+      config->max_duration = std::chrono::seconds{300};
+    }
+
     config->max_runs = -1;
     config->benchmark_mode = BenchmarkMode::Shuffled;
     config->warmup_duration = std::chrono::seconds(0);
     config->enable_scheduler = true;
-    config->clients = 1;
-    config->cores = 1;
+    config->clients = 5;
+    config->cores = 10;
+
+    if (USE_MVCC_DELETE) {
+      // We do not use the MVCC delete plugin for now, as we write by far to few lines to actually make a difference.
+      auto& pm = Hyrise::get().plugin_manager;
+      pm.load_plugin("./rel/lib/libMvccDeletePlugin.dylib");
+    }
 
     auto context = BenchmarkRunner::create_context(*config);
-    context.emplace("scale_factor", WAREHOUSES);
+    context.emplace("scale_factor", warehouse_count);
 
-    auto item_runner = std::make_unique<TPCCBenchmarkItemRunner>(config, WAREHOUSES);
+    auto run_ch_benchmark_queries = std::atomic<bool>{false};
+    auto ch_benchmark_queries = std::vector<std::string>{};
+    if (BENCHMARK == "CH") {
+      constexpr auto TPC_H_SCALE_FACTOR = 1.0f;
+      run_ch_benchmark_queries = true;
+      auto tpch_table_generator = std::make_unique<TPCHTableGenerator>(TPC_H_SCALE_FACTOR, config);
+      tpch_table_generator->generate_and_store();
+
+      const auto ch_benchmark_queries_path = "hyrise/resources/ch_benchmark_queries.sql";
+      std::ifstream ch_benchmark_queries_file(ch_benchmark_queries_path);
+
+      std::string sql_query_string;
+      while (std::getline(ch_benchmark_queries_file, sql_query_string)) {
+        if (sql_query_string.size() > 0 && !sql_query_string.starts_with("--")) {
+          ch_benchmark_queries.emplace_back(sql_query_string);
+        }
+      }
+    }
+
+    auto ch_benchmark_thread = std::thread([&ch_benchmark_queries, &run_ch_benchmark_queries]() {
+      if (!run_ch_benchmark_queries) return;
+
+      auto& storage_manager = Hyrise::get().storage_manager;
+      while (run_ch_benchmark_queries && !storage_manager.has_table("ORDER_LINE")) {
+        std::this_thread::sleep_for(1s);
+      }
+
+      std::cout << "Starting CH-benCHmark queries in 1s." << std::endl;
+      std::this_thread::sleep_for(1s);
+
+      // auto sql_pipeline2 = SQLPipelineBuilder{"SELECT SUM(S_ORDER_CNT) * .005 FROM STOCK, supplier, nation WHERE S_W_ID * S_I_ID = s_suppkey AND s_nationkey = n_nationkey AND n_name = 'GERMANY'"}.create_pipeline();
+      // const auto [status, result] = sql_pipeline2.get_result_table();
+      // Print::print(result);
+
+      auto query_id = size_t{0};
+      const auto query_count = ch_benchmark_queries.size();
+      while (run_ch_benchmark_queries) {
+        query_id = query_id % query_count;
+        std::cout << "CH-benCHmark - Query #" << query_id << ": ";
+        auto sql_pipeline = SQLPipelineBuilder{ch_benchmark_queries[query_id]}.create_pipeline();
+        Timer timer;
+        const auto& [status, result] = sql_pipeline.get_result_table();
+        std::cout << static_cast<size_t>(timer.lap().count()) << " ns";
+        if (result->row_count() < 1) {
+          std::cout << " (empty result: " << ch_benchmark_queries[query_id].substr(0, 100) << "...)";
+        }
+        std::cout << std::endl;
+
+        Assert(status == SQLPipelineStatus::Success, "Execution of query #" + std::to_string(query_id) + " did not succeed.");
+        ++query_id;
+      }
+      std::cout << "Analytical CH-benCHmark queries finished." << std::endl;
+    });
+
+    auto item_runner = std::make_unique<TPCCBenchmarkItemRunner>(config, warehouse_count);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(*config, std::move(item_runner),
-                                                              std::make_unique<TPCCTableGenerator>(WAREHOUSES, config),
+                                                              std::make_unique<TPCCTableGenerator>(warehouse_count, config),
                                                               context);
 
     Hyrise::get().benchmark_runner = benchmark_runner;
     benchmark_runner->run();
+    std::cout << "TPC-C done." << std::endl;
+
+    if (BENCHMARK == "CH") {
+      run_ch_benchmark_queries = false;
+    }
+
+    if (ch_benchmark_thread.joinable()) {
+      ch_benchmark_thread.join();
+    }
+
+    if (USE_MVCC_DELETE) {
+      std::cout << "Number of log entries: " << Hyrise::get().log_manager.log_entries().size() << std::endl;
+      for (const auto& entry : Hyrise::get().log_manager.log_entries()) {
+        const auto timestamp_ns =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(entry.timestamp.time_since_epoch()).count();
+
+        // We need this to format the timestamp in a thread-safe way.
+        // https://stackoverflow.com/questions/25618702/
+        //   why-is-there-no-c11-threadsafe-alternative-to-stdlocaltime-and-stdgmtime
+        std::ostringstream timestamp;
+        auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+        struct tm buffer {};
+        timestamp << std::put_time(localtime_r(&time, &buffer), "%F %T");
+        std::cout << timestamp_ns << ":" << pmr_string{timestamp.str()} << ":" << pmr_string{log_level_to_string.left.at(entry.log_level)} << ":" << static_cast<int32_t>(entry.log_level) << ":" << pmr_string{entry.reporter} << ":" << pmr_string{entry.message} << std::endl;
+      }
+    }
   }
   //
   //  /TPC-C
@@ -296,6 +394,11 @@ void Driver::start() {
   }
 
   std::cout << "Done." << std::endl;
+
+  if (BENCHMARK == "TPC-C" && USE_MVCC_DELETE) {
+    // Not unloading as it seems to hang forever.
+    Hyrise::get().plugin_manager.unload_plugin("MvccDeletePlugin");
+  }
 }
 
 void Driver::stop() {
