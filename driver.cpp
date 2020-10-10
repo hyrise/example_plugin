@@ -105,7 +105,7 @@ void Driver::start() {
                                                   "FixedStringSIMDBP128AndFrameOfReferenceSIMDBP128"}; 
   auto main_encoding = ENCODINGS[0];
 
-  constexpr auto RELEASE = false;
+  constexpr auto RELEASE = true;
 
   const auto env_var_benchmark = std::getenv("BENCHMARK_TO_RUN");
   if (env_var_benchmark == NULL) {
@@ -199,9 +199,9 @@ void Driver::start() {
     SCALE_FACTOR = RELEASE ? 10.0f : 1.0f;
     config->max_runs = RELEASE ? 100 : 1;
 
-    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{5}};
-    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    //const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{2}};
+    //auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
+    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
