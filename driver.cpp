@@ -290,7 +290,6 @@ void Driver::start() {
     auto ch_benchmark_queries = std::vector<std::string>{};
     if (BENCHMARK == "CH") {
       constexpr auto TPC_H_SCALE_FACTOR = 1.0f;
-      run_ch_benchmark_queries = true;
       auto tpch_table_generator = std::make_unique<TPCHTableGenerator>(TPC_H_SCALE_FACTOR, config);
       tpch_table_generator->generate_and_store();
 
@@ -303,6 +302,7 @@ void Driver::start() {
           ch_benchmark_queries.emplace_back(sql_query_string);
         }
       }
+      Assert(ch_benchmark_queries.size() > 0, "Failed to read CH-benCHmark queries.");
     }
 
     auto ch_benchmark_thread = std::thread([&ch_benchmark_queries, &run_ch_benchmark_queries]() {
@@ -340,10 +340,13 @@ void Driver::start() {
       std::cout << "Analytical CH-benCHmark queries finished." << std::endl;
     });
 
+    TPCCTableGenerator(warehouse_count, config).generate_and_store();
+    if (BENCHMARK == "CH") {
+      run_ch_benchmark_queries = true;
+    }
+
     auto item_runner = std::make_unique<TPCCBenchmarkItemRunner>(config, warehouse_count);
-    auto benchmark_runner = std::make_shared<BenchmarkRunner>(*config, std::move(item_runner),
-                                                              std::make_unique<TPCCTableGenerator>(warehouse_count, config),
-                                                              context);
+    auto benchmark_runner = std::make_shared<BenchmarkRunner>(*config, std::move(item_runner), nullptr, context);
 
     Hyrise::get().benchmark_runner = benchmark_runner;
     benchmark_runner->run();
