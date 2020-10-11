@@ -232,12 +232,14 @@ struct WorkloadProjections {
 
 class PlanCacheCsvExporter {
  public:
-  PlanCacheCsvExporter(const std::string export_folder_name);
+  PlanCacheCsvExporter(const std::string export_folder_name,
+                       const std::shared_ptr<SQLPhysicalPlanCache> plan_cache = Hyrise::get().default_pqp_cache);
   void run();
   void write_to_disk() const;
   void write_map_to_disk(const std::string file_name, const std::map<std::string, std::vector<std::string>>& operator_instances) const;
  private:
   StorageManager& _sm;
+  std::shared_ptr<SQLPhysicalPlanCache> _plan_cache;
 
   void _process_table_scan(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);
   void _process_get_table(const std::shared_ptr<const AbstractOperator>& op, const std::string& query_hex_hash);

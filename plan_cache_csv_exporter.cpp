@@ -72,7 +72,9 @@ std::string get_operator_hash(const std::shared_ptr<const AbstractOperator> op) 
 
 namespace opossum {
 
-PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name) : _sm{Hyrise::get().storage_manager}, _export_folder_name{export_folder_name}, _table_scans{}, _projections{} {
+PlanCacheCsvExporter::PlanCacheCsvExporter(const std::string export_folder_name,
+                                           const std::shared_ptr<SQLPhysicalPlanCache> plan_cache)
+    : _sm{Hyrise::get().storage_manager}, _plan_cache{plan_cache}, _export_folder_name{export_folder_name}, _table_scans{}, _projections{} {
   std::ofstream joins_csv;
   std::ofstream general_operators_csv;
 
@@ -102,7 +104,7 @@ void PlanCacheCsvExporter::run() {
   std::ofstream plan_cache_csv_file(_export_folder_name + "/plan_cache.csv");
   plan_cache_csv_file << "QUERY_HASH|EXECUTION_COUNT|QUERY_STRING\n";
 
-  const auto cache_snapshot = Hyrise::get().default_pqp_cache->snapshot();
+  const auto cache_snapshot = _plan_cache->snapshot();
   for (const auto& [query_string, snapshot_entry] : cache_snapshot) {
     const auto& physical_query_plan = snapshot_entry.value;
     const auto& frequency = snapshot_entry.frequency;

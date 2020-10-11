@@ -305,7 +305,9 @@ void Driver::start() {
       Assert(ch_benchmark_queries.size() > 0, "Failed to read CH-benCHmark queries.");
     }
 
-    auto ch_benchmark_thread = std::thread([&ch_benchmark_queries, &run_ch_benchmark_queries]() {
+
+    auto ch_plan_cache = std::make_shared<SQLPhysicalPlanCache>(100'000);
+    auto ch_benchmark_thread = std::thread([&ch_benchmark_queries, &run_ch_benchmark_queries, &ch_plan_cache]() {
       while (!run_ch_benchmark_queries) {
         std::this_thread::sleep_for(1s);
       }
@@ -327,7 +329,7 @@ void Driver::start() {
       while (run_ch_benchmark_queries) {
         query_id = query_id % query_count;
         std::cout << "CH-benCHmark - Query #" << query_id << ": ";
-        auto sql_pipeline = SQLPipelineBuilder{ch_benchmark_queries[query_id]}.create_pipeline();
+        auto sql_pipeline = SQLPipelineBuilder{ch_benchmark_queries[query_id]}.with_pqp_cache(ch_plan_cache).create_pipeline();
         Timer timer;
         const auto& [status, result] = sql_pipeline.get_result_table();
         std::cout << static_cast<size_t>(timer.lap().count()) << " ns";
@@ -358,20 +360,36 @@ void Driver::start() {
       run_ch_benchmark_queries = false;
     }
 
-  std::string folder_name = std::string(BENCHMARK) + "__SF_" + std::to_string(SCALE_FACTOR);
-  folder_name += "__RUNS_" + std::to_string(config->max_runs) + "__ENCODING_" + main_encoding;
-  std::filesystem::create_directories(folder_name);
+    {
+      std::string folder_name = std::string(BENCHMARK) + "__SF_" + std::to_string(SCALE_FACTOR);
+      folder_name += "__RUNS_" + std::to_string(config->max_runs) + "__ENCODING_" + main_encoding;
+      std::filesystem::create_directories(folder_name);
 
-  std::cout << "Exporting table/column/segments meta data." << std::endl;
-  extract_table_meta_data(folder_name);
+      std::cout << "Exporting table/column/segments meta data." << std::endl;
+      extract_table_meta_data(folder_name);
 
-  if (Hyrise::get().default_pqp_cache->size() > 0) {
-    std::cout << "Exporting plan cache data." << std::endl;
-    PlanCacheCsvExporter(folder_name).run();
-  } else {
-    std::cerr << "Plan cache is empty." << std::endl;
-    exit(17);
-  }
+      if (Hyrise::get().default_pqp_cache->size() > 0) {
+        std::cout << "Exporting plan cache data." << std::endl;
+        PlanCacheCsvExporter(folder_name).run();
+      } else {
+        std::cerr << "Plan cache is empty." << std::endl;
+        exit(17);
+      }
+    }
+
+    {
+      std::string folder_name = std::string(BENCHMARK) + "_ANALYTICS__SF_" + std::to_string(SCALE_FACTOR);
+      folder_name += "__RUNS_" + std::to_string(config->max_runs) + "__ENCODING_" + main_encoding;
+      std::filesystem::create_directories(folder_name);
+
+      std::cout << "Exporting table/column/segments meta data." << std::endl;
+      extract_table_meta_data(folder_name);
+
+      if (ch_plan_cache->size() > 0) {
+        std::cout << "Exporting CH plan cache data." << std::endl;
+        PlanCacheCsvExporter(folder_name, ch_plan_cache).run();
+      }
+    }
 
     if (ch_benchmark_thread.joinable()) {
       ch_benchmark_thread.join();
