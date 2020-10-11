@@ -306,10 +306,12 @@ void Driver::start() {
     }
 
     auto ch_benchmark_thread = std::thread([&ch_benchmark_queries, &run_ch_benchmark_queries]() {
-      if (!run_ch_benchmark_queries) return;
+      while (!run_ch_benchmark_queries) {
+        std::this_thread::sleep_for(1s);
+      }
 
       auto& storage_manager = Hyrise::get().storage_manager;
-      while (run_ch_benchmark_queries && !storage_manager.has_table("ORDER_LINE")) {
+      while (run_ch_benchmark_queries && !storage_manager.has_table("ITEM")) {
         std::this_thread::sleep_for(1s);
       }
 
@@ -355,6 +357,21 @@ void Driver::start() {
     if (BENCHMARK == "CH") {
       run_ch_benchmark_queries = false;
     }
+
+  std::string folder_name = std::string(BENCHMARK) + "__SF_" + std::to_string(SCALE_FACTOR);
+  folder_name += "__RUNS_" + std::to_string(config->max_runs) + "__ENCODING_" + main_encoding;
+  std::filesystem::create_directories(folder_name);
+
+  std::cout << "Exporting table/column/segments meta data." << std::endl;
+  extract_table_meta_data(folder_name);
+
+  if (Hyrise::get().default_pqp_cache->size() > 0) {
+    std::cout << "Exporting plan cache data." << std::endl;
+    PlanCacheCsvExporter(folder_name).run();
+  } else {
+    std::cerr << "Plan cache is empty." << std::endl;
+    exit(17);
+  }
 
     if (ch_benchmark_thread.joinable()) {
       ch_benchmark_thread.join();
