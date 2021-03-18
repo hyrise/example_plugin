@@ -11,7 +11,7 @@ class ExamplePlugin : public AbstractPlugin, public Singleton<ExamplePlugin> {
  public:
   ExamplePlugin() : sm{Hyrise::get().storage_manager} {}
 
-  const std::string description() const final;
+  std::string description() const final;
 
   void start() final;
 

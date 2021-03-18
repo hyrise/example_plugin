@@ -4,7 +4,7 @@
 
 namespace opossum {
 
-const std::string ExamplePlugin::description() const { return "This is the Hyrise ExamplePlugin"; }
+std::string ExamplePlugin::description() const { return "This is the Hyrise ExamplePlugin"; }
 
 void ExamplePlugin::start() {
   TableColumnDefinitions column_definitions;
