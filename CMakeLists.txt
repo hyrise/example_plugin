@@ -11,7 +11,7 @@ include_directories(                                                            
     ${PROJECT_SOURCE_DIR}/hyrise/src/lib/                                                           #
     ${PROJECT_SOURCE_DIR}/hyrise/third_party/sql-parser/src                                         #
     ${TBB_INCLUDE_DIR}                                                                              #
-    ${Boost_INCLUDE_DIRS}                                                                           #
+    ${Boost_INCLUDE_DIR}                                                                           #
 )                                                                                                   #
                                                                                                     #
 # Global flags and include directories                                                              #
