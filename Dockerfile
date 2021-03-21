@@ -19,6 +19,8 @@ RUN apt-get update \
         man \
         postgresql-server-dev-all \
         sudo \
+        systemtap \
+        systemtap-sdt-dev \
     && apt-get clean
 
 ENV OPOSSUM_HEADLESS_SETUP=true
