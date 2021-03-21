@@ -1,0 +1,10 @@
+on: [push]
+
+jobs:
+  pipeline_job:
+    runs-on: ubuntu-latest
+    name: Build and Load Test
+    steps:
+    - name: Test
+      id: 17
+      uses: hyrise/example_plugin@master

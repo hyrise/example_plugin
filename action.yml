@@ -1,0 +1,5 @@
+name: 'Example Plugn'
+description: 'Build and load example plugin into server.'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
