@@ -5,4 +5,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Test
-      uses: hyrise/example_plugin@master
+      uses: hyrise/example_plugin@martin/test_stuff
