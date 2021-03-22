@@ -3,7 +3,7 @@
 git clone --recursive https://github.com/hyrise/example_plugin/
 
 cd example_plugin
-./install_dependencies.sh
+./hyrise/install_dependencies.sh
 
 mkdir cmake-build-debug && cd cmake-build-debug
 cmake ..
