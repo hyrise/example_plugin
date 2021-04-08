@@ -5,8 +5,10 @@
 #include "expression/abstract_predicate_expression.hpp"
 #include "expression/expression_utils.hpp"
 #include "expression/lqp_column_expression.hpp"
+#include "logical_query_plan/aggregate_node.hpp"
 #include "logical_query_plan/join_node.hpp"
 #include "logical_query_plan/predicate_node.hpp"
+#include "logical_query_plan/projection_node.hpp"
 #include "logical_query_plan/stored_table_node.hpp"
 #include "operators/abstract_aggregate_operator.hpp"
 #include "operators/get_table.hpp"
@@ -288,7 +290,7 @@ std::string PlanCacheCsvExporter::_process_join(const std::shared_ptr<const Abst
     ss << join_node->node_expressions.size() << "|" << predicate_condition_to_string.left.at((*operator_predicate).predicate_condition) << "|";
     if (const auto join_hash_op = dynamic_pointer_cast<const JoinHash>(op)) {
       const auto& join_hash_perf_data = dynamic_cast<const JoinHash::PerformanceData&>(*join_hash_op->performance_data);
-      const auto build_and_probe_side_flipped = join_hash_perf_data.right_input_is_build_side ? "TRUE" : "FALSE";
+      const auto build_and_probe_side_flipped = join_hash_perf_data.left_input_is_build_side ? "FALSE" : "TRUE";
       ss << build_and_probe_side_flipped << "|" << join_hash_perf_data.radix_bits << "|";
 
       for (const auto step_name : magic_enum::enum_values<JoinHash::OperatorSteps>()) {
@@ -365,8 +367,8 @@ void PlanCacheCsvExporter::_process_table_scan(const std::shared_ptr<const Abstr
         table_scans.emplace_back(SingleTableScan{query_hex_hash, get_operator_hash(op),
                                                  get_operator_hash(op->left_input()), "NULL", column_type, table_name,
                                                  column_name, scan_predicate_condition,
-                                                 operator_perf_data.chunk_scans_skipped,
-                                                 operator_perf_data.chunk_scans_sorted,
+                                                 static_cast<size_t>(-17), // removed due to work on export plugin
+                                                 static_cast<size_t>(-17), // removed due to work on export plugin
                                                  left_input_perf_data->output_chunk_count,
                                                  left_input_perf_data->output_row_count,
                                                  operator_perf_data.output_chunk_count,

@@ -6,14 +6,17 @@
 
 #include "driver.hpp"
 #include "plan_cache_csv_exporter.hpp"
+#include "plugin_meta_tables.hpp"
 
 #include "abstract_table_generator.hpp"
 #include "benchmark_config.hpp"
 #include "benchmark_runner.hpp"
 #include "cli_config_parser.hpp"
 #include "file_based_benchmark_item_runner.hpp"
+#include "plugin_meta_tables.hpp"
 #include "file_based_table_generator.hpp"
 #include "hyrise.hpp"
+#include "import_export/csv/csv_writer.hpp"
 #include "operators/print.hpp"
 #include "sql/sql_pipeline_builder.hpp"
 #include "tpcc/tpcc_benchmark_item_runner.hpp"
@@ -52,41 +55,44 @@ const std::unordered_set<std::string> filename_blacklist() {
   return filename_blacklist;
 }
 
-void extract_table_meta_data(const std::string folder_name) {
-  // TODO: why not use the CSV exporter?
-  auto table_to_csv = [](const std::string table_name, const std::string csv_file_name) {
-    const auto table = SQLPipelineBuilder{"SELECT * FROM " + table_name}
-                          .create_pipeline()
-                          .get_result_table().second;
-    std::ofstream output_file(csv_file_name);
+void table_to_csv(const std::string table_name, const std::string csv_file_name) {
+  const auto table = SQLPipelineBuilder{"SELECT * FROM " + table_name}
+                        .create_pipeline()
+                        .get_result_table().second;
 
-    const auto column_names = table->column_names();
-    for (auto column_id = size_t{0}; column_id < column_names.size(); ++column_id) {
-      auto column_name = column_names[column_id];
-      boost::to_upper(column_name);
-      output_file << column_name;
-      if (column_id < (column_names.size() - 1)) {
-        output_file << "|";
+  // We do not use Hyrise's CSVWriter as it does not emit clean CSV files with headers but rather Hyrise's v1 used
+  // format of a headerless CSV and a meta JSON file.
+
+  std::ofstream output_file(csv_file_name);
+
+  const auto column_names = table->column_names();
+  for (auto column_id = size_t{0}; column_id < column_names.size(); ++column_id) {
+    auto column_name = column_names[column_id];
+    boost::to_upper(column_name);
+    output_file << column_name;
+    if (column_id < (column_names.size() - 1)) {
+      output_file << "|";
+    }
+  }
+  output_file << std::endl;
+
+  const auto row_count = table->row_count();
+  const auto data_types = table->column_data_types();
+  for (auto row_index = size_t{0}; row_index < row_count; ++row_index) {
+    const auto row = table->get_row(row_index);
+    for (auto column_id = size_t{0}; column_id < row.size(); ++column_id) {
+      if (data_types[column_id] == DataType::String) output_file << "\"";
+      output_file << row[column_id];
+      if (data_types[column_id] == DataType::String) output_file << "\"";
+      if (column_id < (row.size() - 1)) {
+      output_file << "|";
       }
     }
     output_file << std::endl;
+  }
+}
 
-    const auto row_count = table->row_count();
-    const auto data_types = table->column_data_types();
-    for (auto row_index = size_t{0}; row_index < row_count; ++row_index) {
-      const auto row = table->get_row(row_index);
-      for (auto column_id = size_t{0}; column_id < row.size(); ++column_id) {
-        if (data_types[column_id] == DataType::String) output_file << "\"";
-        output_file << row[column_id];
-        if (data_types[column_id] == DataType::String) output_file << "\"";
-        if (column_id < (row.size() - 1)) {
-        output_file << "|";
-        }
-      }
-      output_file << std::endl;
-    }
-  };
-
+void extract_table_meta_data(const std::string folder_name) {
   //table_to_csv("meta_segments", folder_name + "/segment_meta_data2.csv");
   table_to_csv("meta_segments_accurate", folder_name + "/segment_meta_data.csv");
   table_to_csv("meta_tables", folder_name + "/table_meta_data.csv");
@@ -105,7 +111,7 @@ void Driver::start() {
                                                   "FixedStringSIMDBP128AndFrameOfReferenceSIMDBP128"}; 
   auto main_encoding = ENCODINGS[0];
 
-  constexpr auto RELEASE = true;
+  constexpr auto RELEASE = false;
 
   const auto env_var_benchmark = std::getenv("BENCHMARK_TO_RUN");
   if (env_var_benchmark == NULL) {
@@ -177,7 +183,7 @@ void Driver::start() {
     config->encoding_config = EncodingConfig(CLIConfigParser::parse_encoding_config(std::string{env_var_encoding_config}));
   }
   config->max_runs = 10;
-  config->enable_visualization = false;
+  config->enable_visualization = true;
   //config->cache_binary_tables = BENCHMARK != "TPC-C" ? true : false;
   config->cache_binary_tables = false;  // There might still be problems with binaries files, safe but slow route
   config->max_duration = std::chrono::seconds(300);
@@ -196,12 +202,12 @@ void Driver::start() {
   //  TPC-H
   //
   if (BENCHMARK == "TPC-H") {
-    SCALE_FACTOR = RELEASE ? 10.0f : 1.0f;
+    SCALE_FACTOR = RELEASE ? 10.0f : 0.1f;
     config->max_runs = RELEASE ? 100 : 1;
 
-    //const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{2}};
-    //auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
-    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
+    const std::vector<BenchmarkItemID> tpch_query_ids_benchmark = {BenchmarkItemID{0}};
+    auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR, tpch_query_ids_benchmark);
+    // auto item_runner = std::make_unique<TPCHBenchmarkItemRunner>(config, USE_PREPARED_STATEMENTS, SCALE_FACTOR);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(
         *config, std::move(item_runner), std::make_unique<TPCHTableGenerator>(SCALE_FACTOR, config), BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
@@ -217,7 +223,7 @@ void Driver::start() {
   //
   else if (BENCHMARK == "TPC-DS") {
     SCALE_FACTOR = RELEASE ? 5.0f : 1.0f;
-    config->max_runs = 100;
+    config->max_runs = RELEASE ? 100 : 1;
     const std::string query_path = "hyrise/resources/benchmark/tpcds/tpcds-result-reproduction/query_qualification";
     if (!std::filesystem::exists("resources/")) {
       std::cout << "When resources for TPC-DS cannot be found, create a symlink as a workaround: 'ln -s hyrise/resources resources'." << std::endl;
@@ -225,7 +231,7 @@ void Driver::start() {
 
     //auto query_generator = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, filename_blacklist(), std::unordered_set<std::string>{"1"});
     auto query_generator = std::make_unique<FileBasedBenchmarkItemRunner>(config, query_path, filename_blacklist());
-    auto table_generator = std::make_unique<TpcdsTableGenerator>(SCALE_FACTOR, config);
+    auto table_generator = std::make_unique<TPCDSTableGenerator>(SCALE_FACTOR, config);
     auto benchmark_runner = std::make_shared<BenchmarkRunner>(*config, std::move(query_generator), std::move(table_generator),
                                                               opossum::BenchmarkRunner::create_context(*config));
     Hyrise::get().benchmark_runner = benchmark_runner;
@@ -266,8 +272,8 @@ void Driver::start() {
     config->max_duration = std::chrono::seconds{20};
 
     if (BENCHMARK == "CH") {
-      warehouse_count = 10;
-      config->max_duration = std::chrono::seconds{300};
+      warehouse_count = 1;
+      config->max_duration = std::chrono::seconds{30};
     }
 
     config->max_runs = -1;
@@ -289,7 +295,7 @@ void Driver::start() {
     auto run_ch_benchmark_queries = std::atomic<bool>{false};
     auto ch_benchmark_queries = std::vector<std::string>{};
     if (BENCHMARK == "CH") {
-      constexpr auto TPC_H_SCALE_FACTOR = 1.0f;
+      constexpr auto TPC_H_SCALE_FACTOR = 0.1f;
       auto tpch_table_generator = std::make_unique<TPCHTableGenerator>(TPC_H_SCALE_FACTOR, config);
       tpch_table_generator->generate_and_store();
 
@@ -416,9 +422,34 @@ void Driver::start() {
   //  /TPC-C
   //
 
+  auto aggregate_table = std::make_shared<MetaPlanCacheAggregates>();
+  auto table_scan_table = std::make_shared<MetaPlanCacheTableScans>();
+  auto joins_table = std::make_shared<MetaPlanCacheJoins>();
+  auto projections_table = std::make_shared<MetaPlanCacheProjections>();
+
+  const auto pqp_cache_snapshot = Hyrise::get().default_pqp_cache->snapshot();
+  aggregate_table->set_plan_cache_snapshot(pqp_cache_snapshot);
+  table_scan_table->set_plan_cache_snapshot(pqp_cache_snapshot);
+  joins_table->set_plan_cache_snapshot(pqp_cache_snapshot);
+  projections_table->set_plan_cache_snapshot(pqp_cache_snapshot);
+
+  Hyrise::get().meta_table_manager.add_table(std::move(aggregate_table));
+  Hyrise::get().meta_table_manager.add_table(std::move(table_scan_table));
+  Hyrise::get().meta_table_manager.add_table(std::move(joins_table));
+  Hyrise::get().meta_table_manager.add_table(std::move(projections_table));
+
+  // const auto table = SQLPipelineBuilder{"SELECT * FROM meta_plan_cache_aggregates"}
+  //                         .create_pipeline()
+  //                         .get_result_table().second;
+
   std::string folder_name = std::string(BENCHMARK) + "__SF_" + std::to_string(SCALE_FACTOR);
   folder_name += "__RUNS_" + std::to_string(config->max_runs) + "__ENCODING_" + main_encoding;
   std::filesystem::create_directories(folder_name);
+
+  table_to_csv("meta_plan_cache_aggregates", folder_name + "/aggregates2.csv");
+  table_to_csv("meta_plan_cache_table_scans", folder_name + "/table_scans2.csv");
+  table_to_csv("meta_plan_cache_joins", folder_name + "/joins2.csv");
+  table_to_csv("meta_plan_cache_projections", folder_name + "/projection2.csv");
 
   std::cout << "Exporting table/column/segments meta data." << std::endl;
   extract_table_meta_data(folder_name);
